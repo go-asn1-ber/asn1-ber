@@ -351,7 +351,7 @@ func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 	out.Write( []byte { p.ClassType | p.TagType | p.Tag } )
 	packet_length := EncodeInteger( p.DataLength() )
-	if len( packet_length ) > 1 {
+	if p.DataLength() > 127 || len( packet_length ) > 1 {
 		out.Write( []byte { byte( len( packet_length ) | 128 ) } )
 		out.Write( packet_length )
 	} else {
