@@ -12,6 +12,7 @@ type Packet struct {
 	TagType     uint8
 	Tag         uint8
 	Value       interface{}
+	ByteValue   []byte
 	Data        *bytes.Buffer
 	Children    []*Packet
 	Description string
@@ -298,6 +299,8 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		}
 	} else if p.ClassType == ClassUniversal {
 		p.Data.Write(data[datapos : datapos+datalen])
+		p.ByteValue = value_data
+
 		switch p.Tag {
 		case TagEOC:
 		case TagBoolean:
