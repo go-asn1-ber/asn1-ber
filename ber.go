@@ -99,13 +99,13 @@ var ClassMap = map[uint8]string{
 }
 
 const (
-	TypePrimative   = 0  // xx0xxxxxb
+	TypePrimitive   = 0  // xx0xxxxxb
 	TypeConstructed = 32 // xx1xxxxxb
 	TypeBitmask     = 32 // xx1xxxxxb
 )
 
 var TypeMap = map[uint8]string{
-	TypePrimative:   "Primative",
+	TypePrimitive:   "Primative",
 	TypeConstructed: "Constructed",
 }
 
@@ -455,7 +455,7 @@ func Encode(ClassType, TagType, Tag uint8, Value interface{}, Description string
 }
 
 func NewSequence(Description string) *Packet {
-	return Encode(ClassUniversal, TypePrimative, TagSequence, nil, Description)
+	return Encode(ClassUniversal, TypePrimitive, TagSequence, nil, Description)
 }
 
 func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *Packet {
