@@ -414,16 +414,7 @@ func (p *Packet) Bytes() []byte {
 
 func (p *Packet) AppendChild(child *Packet) {
 	p.Data.Write(child.Bytes())
-
-	if len(p.Children) == cap(p.Children) {
-		newChildren := make([]*Packet, cap(p.Children)*2)
-
-		copy(newChildren, p.Children)
-		p.Children = newChildren[0:len(p.Children)]
-	}
-
-	p.Children = p.Children[0 : len(p.Children)+1]
-	p.Children[len(p.Children)-1] = child
+	p.Children = append(p.Children, child)
 }
 
 func Encode(ClassType, TagType, Tag uint8, Value interface{}, Description string) *Packet {
