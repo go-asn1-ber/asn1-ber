@@ -352,7 +352,10 @@ func decodePacket(data []byte) (*Packet, []byte) {
 			p.Value = DecodeInteger(value_data)
 		case TagBitString:
 		case TagOctetString:
-			p.Value = DecodeString(value_data)
+			// the actual string encoding is not known here
+			// (e.g. for LDAP value_data is already an UTF8-encoded
+			// string). Return the data without further processing
+			p.Value = string(value_data)
 		case TagNULL:
 		case TagObjectIdentifier:
 		case TagObjectDescriptor:
