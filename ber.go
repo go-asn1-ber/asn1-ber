@@ -173,25 +173,9 @@ func resizeBuffer(in []byte, new_size uint64) (out []byte) {
 	return
 }
 
-func readBytes(reader io.Reader, buf []byte) error {
-	idx := 0
-	buflen := len(buf)
-
-	for idx < buflen {
-		n, err := reader.Read(buf[idx:])
-		if err != nil {
-			return err
-		}
-		idx += n
-	}
-
-	return nil
-}
-
 func ReadPacket(reader io.Reader) (*Packet, error) {
 	buf := make([]byte, 2)
-
-	err := readBytes(reader, buf)
+	_, err := io.ReadFull(reader, buf)
 
 	if err != nil {
 		return nil, err
@@ -216,7 +200,7 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 		idx += a
 		buf = resizeBuffer(buf, 2+a)
 
-		err := readBytes(reader, buf[2:])
+		_, err := io.ReadFull(reader, buf[2:])
 
 		if err != nil {
 			return nil, err
@@ -236,7 +220,7 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 	}
 
 	buf = resizeBuffer(buf, idx+datalen)
-	err = readBytes(reader, buf[idx:])
+	_, err = io.ReadFull(reader, buf[idx:])
 
 	if err != nil {
 		return nil, err
