@@ -239,12 +239,8 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 	return p, nil
 }
 
-func DecodeString(data []byte) (ret string) {
-	for _, c := range data {
-		ret += fmt.Sprintf("%c", c)
-	}
-
-	return
+func DecodeString(data []byte) string {
+	return string(data)
 }
 
 func DecodeInteger(data []byte) (ret uint64) {
