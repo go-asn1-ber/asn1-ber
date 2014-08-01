@@ -51,7 +51,7 @@ const (
 	TagBitmask          = 0x1f // xxx11111b
 )
 
-var TagMap = map[uint8]string{
+var tagMap = map[uint8]string{
 	TagEOC:              "EOC (End-of-Content)",
 	TagBoolean:          "Boolean",
 	TagInteger:          "Integer",
@@ -105,7 +105,7 @@ const (
 )
 
 var TypeMap = map[uint8]string{
-	TypePrimitive:   "Primative",
+	TypePrimitive:   "Primitive",
 	TypeConstructed: "Constructed",
 }
 
@@ -144,7 +144,7 @@ func printPacket(p *Packet, indent int, printBytes bool) {
 	tag_str := fmt.Sprintf("0x%02X", p.Tag)
 
 	if p.ClassType == ClassUniversal {
-		tag_str = TagMap[p.Tag]
+		tag_str = tagMap[p.Tag]
 	}
 
 	value := fmt.Sprint(p.Value)
