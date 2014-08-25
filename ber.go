@@ -429,7 +429,7 @@ func Encode(ClassType, TagType, Tag uint8, Value interface{}, Description string
 }
 
 func NewSequence(Description string) *Packet {
-	return Encode(ClassUniversal, TypePrimitive, TagSequence, nil, Description)
+	return Encode(ClassUniversal, TypeConstructed, TagSequence, nil, Description)
 }
 
 func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *Packet {
