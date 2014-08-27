@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 )
 
@@ -111,7 +112,7 @@ var TypeMap = map[uint8]string{
 
 var Debug bool = false
 
-func PrintBytes(buf []byte, indent string) {
+func PrintBytes(out io.Writer, buf []byte, indent string) {
 	data_lines := make([]string, (len(buf)/30)+1)
 	num_lines := make([]string, (len(buf)/30)+1)
 
@@ -121,16 +122,16 @@ func PrintBytes(buf []byte, indent string) {
 	}
 
 	for i := 0; i < len(data_lines); i++ {
-		fmt.Print(indent + data_lines[i] + "\n")
-		fmt.Print(indent + num_lines[i] + "\n\n")
+		out.Write([]byte(indent + data_lines[i] + "\n"))
+		out.Write([]byte(indent + num_lines[i] + "\n\n"))
 	}
 }
 
 func PrintPacket(p *Packet) {
-	printPacket(p, 0, false)
+	printPacket(os.Stdout, p, 0, false)
 }
 
-func printPacket(p *Packet, indent int, printBytes bool) {
+func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
 	indent_str := ""
 
 	for len(indent_str) != indent {
@@ -154,14 +155,14 @@ func printPacket(p *Packet, indent int, printBytes bool) {
 		description = p.Description + ": "
 	}
 
-	fmt.Printf("%s%s(%s, %s, %s) Len=%d %q\n", indent_str, description, class_str, tagtype_str, tag_str, p.Data.Len(), value)
+	fmt.Fprintf(out, "%s%s(%s, %s, %s) Len=%d %q\n", indent_str, description, class_str, tagtype_str, tag_str, p.Data.Len(), value)
 
 	if printBytes {
-		PrintBytes(p.Bytes(), indent_str)
+		PrintBytes(out, p.Bytes(), indent_str)
 	}
 
 	for _, child := range p.Children {
-		printPacket(child, indent+1, printBytes)
+		printPacket(out, child, indent+1, printBytes)
 	}
 }
 

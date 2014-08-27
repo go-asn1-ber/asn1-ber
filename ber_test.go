@@ -3,6 +3,7 @@ package ber
 import (
 	"bytes"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -118,7 +119,7 @@ func TestPrint(t *testing.T) {
 	PrintPacket(sequence)
 
 	encodedSequence := sequence.Bytes()
-	PrintBytes(encodedSequence, "\t")
+	PrintBytes(os.Stdout, encodedSequence, "\t")
 }
 
 func TestReadPacket(t *testing.T) {
