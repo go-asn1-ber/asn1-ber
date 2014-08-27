@@ -19,6 +19,11 @@ type Packet struct {
 	Description string
 }
 
+const maxUint = ^uint64(0)
+const minUint = 0
+const maxInt = int64(maxUint >> 1)
+const minInt = -(maxInt - 1)
+
 const (
 	TagEOC              = 0x00
 	TagBoolean          = 0x01
@@ -207,7 +212,7 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 			return nil, err
 		}
 
-		datalen = DecodeInteger(buf[2 : 2+a])
+		datalen = uint64(DecodeInteger(buf[2 : 2+a]))
 
 		if Debug {
 			fmt.Printf("Read: a = %d  idx = %d  datalen = %d  len(buf) = %d", a, idx, datalen, len(buf))
@@ -244,11 +249,16 @@ func DecodeString(data []byte) string {
 	return string(data)
 }
 
-func DecodeInteger(data []byte) (ret uint64) {
+func DecodeInteger(data []byte) (ret int64) {
 	for _, i := range data {
 		ret = ret * 256
-		ret = ret + uint64(i)
+		ret = ret + int64(i)
 	}
+	/*
+	 *if data[0]>>7 == 1 {
+	 *    ret = ret - minInt
+	 *}
+	 */
 
 	return
 }
@@ -277,6 +287,81 @@ func EncodeInteger(val uint64) []byte {
 
 	return out.Bytes()
 }
+func EncodeSignedInteger(val int64) []byte {
+	/*
+	 *    var out bytes.Buffer
+	 *
+	 *    n := int64Length(val)
+	 *
+	 *    for ; n > 0; n-- {
+	 *        err := out.WriteByte(byte(val >> uint((val-1)*8)))
+	 *        if err != nil {
+	 *            panic("")
+	 *        }
+	 *    }
+	 *
+	 *    return out.Bytes()
+	 */
+
+	var out bytes.Buffer
+
+	/* if val < 0 {*/
+	//val *= -1
+
+	/*}*/
+
+	found := false
+
+	shift := uint(48)
+
+	mask := int64(0xFF000000000000)
+
+	for mask > 0 {
+		if !found && (val&mask != 0) {
+			found = true
+		}
+
+		if found || (shift == 0) {
+			out.Write([]byte{byte((val & mask) >> shift)})
+		}
+
+		shift -= 8
+		mask = mask >> 8
+	}
+
+	return out.Bytes()
+
+	/*
+	 *    var out bytes.Buffer
+	 *
+	 *    length := int64Length(val)
+	 *
+	 *    for i := length; i > 0; i-- {
+	 *        current := val << uint(8-i) * 8
+	 *        current >>= uint(8-1) * 8
+	 *        out.Write([]byte{byte(current)})
+	 *    }
+	 *
+	 *    fmt.Printf("%+v EncodeSignedInteger\n", out.Bytes())
+	 *    return out.Bytes()
+	 */
+}
+func int64Length(i int64) (numBytes int) {
+	numBytes = 1
+
+	for i > 127 {
+		numBytes++
+		i >>= 8
+	}
+
+	for i < -128 {
+		numBytes++
+		i >>= 8
+	}
+
+	return
+
+}
 
 func DecodePacket(data []byte) *Packet {
 	p, _ := decodePacket(data)
@@ -295,13 +380,13 @@ func decodePacket(data []byte) (*Packet, []byte) {
 	p.TagType = data[0] & TypeBitmask
 	p.Tag = data[0] & TagBitmask
 
-	datalen := DecodeInteger(data[1:2])
+	datalen := uint64(DecodeInteger(data[1:2]))
 	datapos := uint64(2)
 
 	if datalen&128 != 0 {
 		datalen -= 128
 		datapos += datalen
-		datalen = DecodeInteger(data[2 : 2+datalen])
+		datalen = uint64(DecodeInteger(data[2 : 2+datalen]))
 	}
 
 	p.Data = new(bytes.Buffer)
@@ -379,7 +464,7 @@ func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 
 	out.Write([]byte{p.ClassType | p.TagType | p.Tag})
-	packet_length := EncodeInteger(p.DataLength())
+	packet_length := EncodeSignedInteger(int64(p.DataLength()))
 
 	if p.DataLength() > 127 || len(packet_length) > 1 {
 		out.Write([]byte{byte(len(packet_length) | 128)})
@@ -453,6 +538,15 @@ func NewInteger(ClassType, TagType, Tag uint8, Value uint64, Description string)
 
 	p.Value = Value
 	p.Data.Write(EncodeInteger(Value))
+
+	return p
+}
+
+func NewSignedInteger(ClassType, TagType, Tag uint8, Value int64, Description string) *Packet {
+	p := Encode(ClassType, TagType, Tag, nil, Description)
+
+	p.Value = Value
+	p.Data.Write(EncodeSignedInteger(Value))
 
 	return p
 }
