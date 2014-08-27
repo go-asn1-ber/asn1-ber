@@ -254,11 +254,6 @@ func DecodeInteger(data []byte) (ret int64) {
 		ret = ret * 256
 		ret = ret + int64(i)
 	}
-	/*
-	 *if data[0]>>7 == 1 {
-	 *    ret = ret - minInt
-	 *}
-	 */
 
 	return
 }
@@ -288,27 +283,8 @@ func EncodeInteger(val uint64) []byte {
 	return out.Bytes()
 }
 func EncodeSignedInteger(val int64) []byte {
-	/*
-	 *    var out bytes.Buffer
-	 *
-	 *    n := int64Length(val)
-	 *
-	 *    for ; n > 0; n-- {
-	 *        err := out.WriteByte(byte(val >> uint((val-1)*8)))
-	 *        if err != nil {
-	 *            panic("")
-	 *        }
-	 *    }
-	 *
-	 *    return out.Bytes()
-	 */
 
 	var out bytes.Buffer
-
-	/* if val < 0 {*/
-	//val *= -1
-
-	/*}*/
 
 	found := false
 
@@ -331,21 +307,43 @@ func EncodeSignedInteger(val int64) []byte {
 
 	return out.Bytes()
 
-	/*
-	 *    var out bytes.Buffer
-	 *
-	 *    length := int64Length(val)
-	 *
-	 *    for i := length; i > 0; i-- {
-	 *        current := val << uint(8-i) * 8
-	 *        current >>= uint(8-1) * 8
-	 *        out.Write([]byte{byte(current)})
-	 *    }
-	 *
-	 *    fmt.Printf("%+v EncodeSignedInteger\n", out.Bytes())
-	 *    return out.Bytes()
-	 */
 }
+
+/*
+ *func EncodeSignedInteger(val int64) []byte {
+ *    var out bytes.Buffer
+ *
+ *    length := int64Length(val)
+ *
+ *    for i := length; i > 0; i-- {
+ *        current := val << uint(8-i) * 8
+ *        current >>= uint(8-1) * 8
+ *        out.Write([]byte{byte(current)})
+ *    }
+ *
+ *    fmt.Printf("%+v EncodeSignedInteger\n", out.Bytes())
+ *    return out.Bytes()
+ *}
+ */
+
+/*
+ *func EncodeSignedInteger(val int64) []byte {
+ *    var out bytes.Buffer
+ *
+ *    n := int64Length(val)
+ *
+ *    for ; n > 0; n-- {
+ *        err := out.WriteByte(byte(val >> uint((val-1)*8)))
+ *        if err != nil {
+ *            panic("")
+ *        }
+ *    }
+ *
+ *    return out.Bytes()
+ *
+ *}
+ */
+
 func int64Length(i int64) (numBytes int) {
 	numBytes = 1
 

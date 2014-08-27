@@ -7,21 +7,37 @@ import (
 	"testing"
 )
 
+func TestEncodeDecodeSignedInteger(t *testing.T) {
+	encodeDecodeSignedInteger(t, 0)
+	encodeDecodeSignedInteger(t, 10)
+	encodeDecodeSignedInteger(t, 128)
+	encodeDecodeSignedInteger(t, 1024)
+	encodeDecodeSignedInteger(t, -1)
+	encodeDecodeSignedInteger(t, -100)
+	encodeDecodeSignedInteger(t, -1024)
+}
+
+func encodeDecodeSignedInteger(t *testing.T, value int64) {
+	encodedInteger := EncodeSignedInteger(value)
+	decodedInteger := int64(DecodeInteger(encodedInteger))
+
+	if value != int64(decodedInteger) {
+		t.Error("wrong should be equal", value, decodedInteger)
+	}
+}
+
 func TestEncodeDecodeInteger(t *testing.T) {
 	encodeDecodeInteger(t, 0)
 	encodeDecodeInteger(t, 10)
 	encodeDecodeInteger(t, 128)
 	encodeDecodeInteger(t, 1024)
-	encodeDecodeInteger(t, -1)
-	encodeDecodeInteger(t, -100)
-	encodeDecodeInteger(t, -1024)
 }
 
-func encodeDecodeInteger(t *testing.T, value int64) {
-	encodedInteger := EncodeSignedInteger(value)
+func encodeDecodeInteger(t *testing.T, value uint64) {
+	encodedInteger := EncodeInteger(value)
 	decodedInteger := int64(DecodeInteger(encodedInteger))
 
-	if value != int64(decodedInteger) {
+	if value != uint64(decodedInteger) {
 		t.Error("wrong should be equal", value, decodedInteger)
 	}
 }
@@ -52,18 +68,22 @@ func TestInteger(t *testing.T) {
 
 	packet := NewInteger(ClassUniversal, TypePrimitive, TagInteger, value, "Integer, 10")
 
-	newInteger, ok := packet.Value.(uint64)
-	if !ok || newInteger != value {
-		t.Error("error during creating packet")
+	{
+		newInteger, ok := packet.Value.(uint64)
+		if !ok || newInteger != value {
+			t.Error("error during creating packet")
+		}
 	}
 
 	encodedPacket := packet.Bytes()
 
 	newPacket := DecodePacket(encodedPacket)
 
-	newInteger, ok = newPacket.Value.(uint64)
-	if !ok || newInteger != value {
-		t.Error("error during decoding packet")
+	{
+		newInteger, ok := newPacket.Value.(int64)
+		if !ok || uint64(newInteger) != value {
+			t.Error("error during decoding packet")
+		}
 	}
 }
 
@@ -132,6 +152,23 @@ func TestReadPacket(t *testing.T) {
 func TestBinaryInteger(t *testing.T) {
 	// data src : http://luca.ntop.org/Teaching/Appunti/asn1.html 5.7
 
+	if !bytes.Equal([]byte{0x02, 0x01, 0x00}, NewInteger(ClassUniversal, TypePrimitive, TagInteger, 0, "").Bytes()) {
+		t.Error("wrong binary generated")
+	}
+	if !bytes.Equal([]byte{0x02, 0x01, 0x7F}, NewInteger(ClassUniversal, TypePrimitive, TagInteger, 127, "").Bytes()) {
+		t.Error("wrong binary generated")
+	}
+	if !bytes.Equal([]byte{0x02, 0x02, 0x00, 0x80}, NewInteger(ClassUniversal, TypePrimitive, TagInteger, 128, "").Bytes()) {
+		t.Error("wrong binary generated")
+	}
+	if !bytes.Equal([]byte{0x02, 0x02, 0x01, 0x00}, NewInteger(ClassUniversal, TypePrimitive, TagInteger, 256, "").Bytes()) {
+		t.Error("wrong binary generated")
+	}
+}
+
+func TestBinarySignedInteger(t *testing.T) {
+	// data src : http://luca.ntop.org/Teaching/Appunti/asn1.html 5.7
+
 	if !bytes.Equal([]byte{0x02, 0x01, 0x00}, NewSignedInteger(ClassUniversal, TypePrimitive, TagInteger, 0, "").Bytes()) {
 		t.Error("wrong binary generated")
 	}
@@ -150,7 +187,6 @@ func TestBinaryInteger(t *testing.T) {
 	if !bytes.Equal([]byte{0x02, 0x01, 0xFF, 0x7F}, NewSignedInteger(ClassUniversal, TypePrimitive, TagInteger, -129, "").Bytes()) {
 		t.Error("wrong binary generated")
 	}
-
 }
 
 func TestBinaryOctetString(t *testing.T) {
