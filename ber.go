@@ -212,7 +212,11 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 			return nil, err
 		}
 
-		datalen = uint64(DecodeInteger(buf[2 : 2+a]))
+		if d, err := parseInt64(buf[2 : 2+a]); err != nil {
+			return nil, err
+		} else {
+			datalen = uint64(d)
+		}
 
 		if Debug {
 			fmt.Printf("Read: a = %d  idx = %d  datalen = %d  len(buf) = %d", a, idx, datalen, len(buf))
@@ -249,100 +253,35 @@ func DecodeString(data []byte) string {
 	return string(data)
 }
 
-func DecodeInteger(data []byte) (ret int64) {
-	for _, i := range data {
-		ret = ret * 256
-		ret = ret + int64(i)
+func parseInt64(bytes []byte) (ret int64, err error) {
+	if len(bytes) > 8 {
+		// We'll overflow an int64 in this case.
+		err = fmt.Errorf("integer too large")
+		return
+	}
+	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
+		ret <<= 8
+		ret |= int64(bytes[bytesRead])
 	}
 
+	// Shift up and down in order to sign extend the result.
+	ret <<= 64 - uint8(len(bytes))*8
+	ret >>= 64 - uint8(len(bytes))*8
 	return
 }
 
-func EncodeInteger(val uint64) []byte {
-	var out bytes.Buffer
+func encodeInteger(i int64) []byte {
+	n := int64Length(i)
+	out := make([]byte, n)
 
-	found := false
-
-	shift := uint(56)
-
-	mask := uint64(0xFF00000000000000)
-
-	for mask > 0 {
-		if !found && (val&mask != 0) {
-			found = true
-		}
-
-		if found || (shift == 0) {
-			out.Write([]byte{byte((val & mask) >> shift)})
-		}
-
-		shift -= 8
-		mask = mask >> 8
+	var j int
+	for ; n > 0; n-- {
+		out[j] = (byte(i >> uint((n-1)*8)))
+		j++
 	}
 
-	return out.Bytes()
+	return out
 }
-func EncodeSignedInteger(val int64) []byte {
-
-	var out bytes.Buffer
-
-	found := false
-
-	shift := uint(48)
-
-	mask := int64(0xFF000000000000)
-
-	for mask > 0 {
-		if !found && (val&mask != 0) {
-			found = true
-		}
-
-		if found || (shift == 0) {
-			out.Write([]byte{byte((val & mask) >> shift)})
-		}
-
-		shift -= 8
-		mask = mask >> 8
-	}
-
-	return out.Bytes()
-
-}
-
-/*
- *func EncodeSignedInteger(val int64) []byte {
- *    var out bytes.Buffer
- *
- *    length := int64Length(val)
- *
- *    for i := length; i > 0; i-- {
- *        current := val << uint(8-i) * 8
- *        current >>= uint(8-1) * 8
- *        out.Write([]byte{byte(current)})
- *    }
- *
- *    fmt.Printf("%+v EncodeSignedInteger\n", out.Bytes())
- *    return out.Bytes()
- *}
- */
-
-/*
- *func EncodeSignedInteger(val int64) []byte {
- *    var out bytes.Buffer
- *
- *    n := int64Length(val)
- *
- *    for ; n > 0; n-- {
- *        err := out.WriteByte(byte(val >> uint((val-1)*8)))
- *        if err != nil {
- *            panic("")
- *        }
- *    }
- *
- *    return out.Bytes()
- *
- *}
- */
 
 func int64Length(i int64) (numBytes int) {
 	numBytes = 1
@@ -358,7 +297,6 @@ func int64Length(i int64) (numBytes int) {
 	}
 
 	return
-
 }
 
 func DecodePacket(data []byte) *Packet {
@@ -378,13 +316,19 @@ func decodePacket(data []byte) (*Packet, []byte) {
 	p.TagType = data[0] & TypeBitmask
 	p.Tag = data[0] & TagBitmask
 
-	datalen := uint64(DecodeInteger(data[1:2]))
-	datapos := uint64(2)
+	datalen, err := parseInt64(data[1:2])
+	if err != nil {
+		return nil, nil // TODO : return error
+	}
+	datapos := int64(2)
 
 	if datalen&128 != 0 {
 		datalen -= 128
 		datapos += datalen
-		datalen = uint64(DecodeInteger(data[2 : 2+datalen]))
+		datalen, err = parseInt64(data[2 : 2+datalen])
+		if err == nil || datalen < 0 {
+			return nil, nil // TODO : return error
+		}
 	}
 
 	p.Data = new(bytes.Buffer)
@@ -409,11 +353,11 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		switch p.Tag {
 		case TagEOC:
 		case TagBoolean:
-			val := DecodeInteger(value_data)
+			val, _ := parseInt64(value_data)
 
 			p.Value = val != 0
 		case TagInteger:
-			p.Value = DecodeInteger(value_data)
+			p.Value, _ = parseInt64(value_data)
 		case TagBitString:
 		case TagOctetString:
 			// the actual string encoding is not known here
@@ -426,7 +370,7 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		case TagExternal:
 		case TagRealFloat:
 		case TagEnumerated:
-			p.Value = DecodeInteger(value_data)
+			p.Value, _ = parseInt64(value_data)
 		case TagEmbeddedPDV:
 		case TagUTF8String:
 		case TagRelativeOID:
@@ -434,7 +378,7 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		case TagSet:
 		case TagNumericString:
 		case TagPrintableString:
-			p.Value = DecodeString(value_data)
+			p.Value, _ = parseInt64(value_data)
 		case TagT61String:
 		case TagVideotexString:
 		case TagIA5String:
@@ -454,17 +398,13 @@ func decodePacket(data []byte) (*Packet, []byte) {
 	return p, data[datapos+datalen:]
 }
 
-func (p *Packet) DataLength() uint64 {
-	return uint64(p.Data.Len())
-}
-
 func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 
 	out.Write([]byte{p.ClassType | p.TagType | p.Tag})
-	packet_length := EncodeSignedInteger(int64(p.DataLength()))
+	packet_length := encodeInteger(int64(p.Data.Len()))
 
-	if p.DataLength() > 127 || len(packet_length) > 1 {
+	if p.Data.Len() > 127 || len(packet_length) > 1 {
 		out.Write([]byte{byte(len(packet_length) | 128)})
 		out.Write(packet_length)
 	} else {
@@ -517,7 +457,7 @@ func NewSequence(Description string) *Packet {
 }
 
 func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *Packet {
-	intValue := 0
+	intValue := int64(0)
 
 	if Value {
 		intValue = 1
@@ -526,7 +466,7 @@ func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
-	p.Data.Write(EncodeInteger(uint64(intValue)))
+	p.Data.Write(encodeInteger(intValue))
 
 	return p
 }
@@ -535,7 +475,7 @@ func NewInteger(ClassType, TagType, Tag uint8, Value uint64, Description string)
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
-	p.Data.Write(EncodeInteger(Value))
+	p.Data.Write(encodeInteger(int64(Value)))
 
 	return p
 }
@@ -544,7 +484,7 @@ func NewSignedInteger(ClassType, TagType, Tag uint8, Value int64, Description st
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
-	p.Data.Write(EncodeSignedInteger(Value))
+	p.Data.Write(encodeInteger(Value))
 
 	return p
 }
