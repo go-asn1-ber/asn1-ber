@@ -19,11 +19,6 @@ type Packet struct {
 	Description string
 }
 
-const maxUint = ^uint64(0)
-const minUint = 0
-const maxInt = int64(maxUint >> 1)
-const minInt = -(maxInt - 1)
-
 const (
 	TagEOC              = 0x00
 	TagBoolean          = 0x01
