@@ -43,14 +43,14 @@ func TestBoolean(t *testing.T) {
 }
 
 func TestInteger(t *testing.T) {
-	var value uint64 = 10
+	var value int64 = 10
 
 	packet := NewInteger(ClassUniversal, TypePrimitive, TagInteger, value, "Integer, 10")
 
 	{
-		newInteger, ok := packet.Value.(uint64)
+		newInteger, ok := packet.Value.(int64)
 		if !ok || newInteger != value {
-			t.Error("error during creating packet")
+			t.Error("error creating packet")
 		}
 	}
 
@@ -60,8 +60,8 @@ func TestInteger(t *testing.T) {
 
 	{
 		newInteger, ok := newPacket.Value.(int64)
-		if !ok || uint64(newInteger) != value {
-			t.Error("error during decoding packet")
+		if !ok || int64(newInteger) != value {
+			t.Error("error decoding packet")
 		}
 	}
 }
@@ -143,7 +143,7 @@ func TestBinaryInteger(t *testing.T) {
 	}
 
 	for _, d := range data {
-		if b := NewInteger(ClassUniversal, TypePrimitive, TagInteger, uint64(d.v), "").Bytes(); !bytes.Equal(d.e, b) {
+		if b := NewInteger(ClassUniversal, TypePrimitive, TagInteger, int64(d.v), "").Bytes(); !bytes.Equal(d.e, b) {
 			t.Errorf("Wrong binary generated for %d : got % X, expected % X", d.v, b, d.e)
 		}
 	}

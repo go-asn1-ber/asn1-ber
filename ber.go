@@ -166,7 +166,7 @@ func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
 	}
 }
 
-func resizeBuffer(in []byte, new_size uint64) (out []byte) {
+func resizeBuffer(in []byte, new_size int) (out []byte) {
 	out = make([]byte, new_size)
 
 	copy(out, in)
@@ -175,46 +175,52 @@ func resizeBuffer(in []byte, new_size uint64) (out []byte) {
 }
 
 func ReadPacket(reader io.Reader) (*Packet, error) {
-	buf := make([]byte, 2)
+	var header [2]byte
+	buf := header[:]
 	_, err := io.ReadFull(reader, buf)
 
 	if err != nil {
 		return nil, err
 	}
 
-	idx := uint64(2)
-	datalen := uint64(buf[1])
+	idx := 2
+	var datalen int
+	l := buf[1]
 
-	if Debug {
-		fmt.Printf("Read: datalen = %d len(buf) = %d ", datalen, len(buf))
+	if l&0x80 == 0 {
+		// The length is encoded in the bottom 7 bits.
+		datalen = int(l & 0x7f)
+		if Debug {
+			fmt.Printf("Read: datalen = %d len(buf) = %d\n  ", l, len(buf))
 
-		for _, b := range buf {
-			fmt.Printf("%02X ", b)
+			for _, b := range buf {
+				fmt.Printf("%02X ", b)
+			}
+
+			fmt.Printf("\n")
 		}
-
-		fmt.Printf("\n")
-	}
-
-	if datalen&128 != 0 {
-		a := datalen - 128
-
-		idx += a
-		buf = resizeBuffer(buf, 2+a)
-
+	} else {
+		// Bottom 7 bits give the number of length bytes to follow.
+		numBytes := int(l & 0x7f)
+		if numBytes == 0 {
+			return nil, fmt.Errorf("invalid length found")
+		}
+		idx += numBytes
+		buf = resizeBuffer(buf, 2+numBytes)
 		_, err := io.ReadFull(reader, buf[2:])
 
 		if err != nil {
 			return nil, err
 		}
-
-		if d, err := parseInt64(buf[2 : 2+a]); err != nil {
-			return nil, err
-		} else {
-			datalen = uint64(d)
+		datalen = 0
+		for i := 0; i < numBytes; i++ {
+			b := buf[2+i]
+			datalen <<= 8
+			datalen |= int(b)
 		}
 
 		if Debug {
-			fmt.Printf("Read: a = %d  idx = %d  datalen = %d  len(buf) = %d", a, idx, datalen, len(buf))
+			fmt.Printf("Read: datalen = %d numbytes=%d len(buf) = %d\n  ", datalen, numBytes, len(buf))
 
 			for _, b := range buf {
 				fmt.Printf("%02X ", b)
@@ -232,14 +238,14 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 	}
 
 	if Debug {
-		fmt.Printf("Read: len( buf ) = %d  idx=%d datalen=%d idx+datalen=%d\n", len(buf), idx, datalen, idx+datalen)
+		fmt.Printf("Read: len( buf ) = %d  idx=%d datalen=%d idx+datalen=%d\n  ", len(buf), idx, datalen, idx+datalen)
 
 		for _, b := range buf {
 			fmt.Printf("%02X ", b)
 		}
 	}
 
-	p := DecodePacket(buf)
+	p, _ := decodePacket(buf)
 
 	return p, nil
 }
@@ -311,18 +317,24 @@ func decodePacket(data []byte) (*Packet, []byte) {
 	p.TagType = data[0] & TypeBitmask
 	p.Tag = data[0] & TagBitmask
 
-	datalen, err := parseInt64(data[1:2])
-	if err != nil {
-		return nil, nil // TODO : return error
-	}
-	datapos := int64(2)
-
-	if datalen&128 != 0 {
-		datalen -= 128
-		datapos += datalen
-		datalen, err = parseInt64(data[2 : 2+datalen])
-		if err == nil || datalen < 0 {
-			return nil, nil // TODO : return error
+	var datalen int
+	l := data[1]
+	datapos := 2
+	if l&0x80 == 0 {
+		// The length is encoded in the bottom 7 bits.
+		datalen = int(l & 0x7f)
+	} else {
+		// Bottom 7 bits give the number of length bytes to follow.
+		numBytes := int(l & 0x7f)
+		if numBytes == 0 {
+			return nil, nil
+		}
+		datapos += numBytes
+		datalen = 0
+		for i := 0; i < numBytes; i++ {
+			b := data[2+i]
+			datalen <<= 8
+			datalen |= int(b)
 		}
 	}
 
@@ -466,16 +478,7 @@ func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *
 	return p
 }
 
-func NewInteger(ClassType, TagType, Tag uint8, Value uint64, Description string) *Packet {
-	p := Encode(ClassType, TagType, Tag, nil, Description)
-
-	p.Value = Value
-	p.Data.Write(encodeInteger(int64(Value)))
-
-	return p
-}
-
-func NewSignedInteger(ClassType, TagType, Tag uint8, Value int64, Description string) *Packet {
+func NewInteger(ClassType, TagType, Tag uint8, Value int64, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
