@@ -370,7 +370,7 @@ func decodePacket(data []byte) (*Packet, []byte) {
 			// the actual string encoding is not known here
 			// (e.g. for LDAP value_data is already an UTF8-encoded
 			// string). Return the data without further processing
-			p.Value = string(value_data)
+			p.Value = DecodeString(value_data)
 		case TagNULL:
 		case TagObjectIdentifier:
 		case TagObjectDescriptor:
@@ -385,7 +385,7 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		case TagSet:
 		case TagNumericString:
 		case TagPrintableString:
-			p.Value, _ = parseInt64(value_data)
+			p.Value = DecodeString(value_data)
 		case TagT61String:
 		case TagVideotexString:
 		case TagIA5String:
