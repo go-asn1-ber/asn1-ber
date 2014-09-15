@@ -484,11 +484,36 @@ func NewBoolean(ClassType Class, TagType Type, Tag Tag, Value bool, Description 
 	return p
 }
 
-func NewInteger(ClassType Class, TagType Type, Tag Tag, Value int64, Description string) *Packet {
+func NewInteger(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
-	p.Data.Write(encodeInteger(Value))
+	switch v := Value.(type) {
+	case int:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint:
+		p.Data.Write(encodeInteger(int64(v)))
+	case int64:
+		p.Data.Write(encodeInteger(v))
+	case uint64:
+		// TODO : check range or add encodeUInt...
+		p.Data.Write(encodeInteger(int64(v)))
+	case int32:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint32:
+		p.Data.Write(encodeInteger(int64(v)))
+	case int16:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint16:
+		p.Data.Write(encodeInteger(int64(v)))
+	case int8:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint8:
+		p.Data.Write(encodeInteger(int64(v)))
+	default:
+		// TODO : add support for big.Int ?
+		panic(fmt.Sprintf("Invalid type %T, expected {u|}int{64|32|16|8}", v))
+	}
 
 	return p
 }
