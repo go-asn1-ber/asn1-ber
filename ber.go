@@ -9,9 +9,9 @@ import (
 )
 
 type Packet struct {
-	ClassType   uint8
-	TagType     uint8
-	Tag         uint8
+	ClassType   Class
+	TagType     Type
+	Tag         Tag
 	Value       interface{}
 	ByteValue   []byte
 	Data        *bytes.Buffer
@@ -19,40 +19,42 @@ type Packet struct {
 	Description string
 }
 
+type Tag uint8
+
 const (
-	TagEOC              = 0x00
-	TagBoolean          = 0x01
-	TagInteger          = 0x02
-	TagBitString        = 0x03
-	TagOctetString      = 0x04
-	TagNULL             = 0x05
-	TagObjectIdentifier = 0x06
-	TagObjectDescriptor = 0x07
-	TagExternal         = 0x08
-	TagRealFloat        = 0x09
-	TagEnumerated       = 0x0a
-	TagEmbeddedPDV      = 0x0b
-	TagUTF8String       = 0x0c
-	TagRelativeOID      = 0x0d
-	TagSequence         = 0x10
-	TagSet              = 0x11
-	TagNumericString    = 0x12
-	TagPrintableString  = 0x13
-	TagT61String        = 0x14
-	TagVideotexString   = 0x15
-	TagIA5String        = 0x16
-	TagUTCTime          = 0x17
-	TagGeneralizedTime  = 0x18
-	TagGraphicString    = 0x19
-	TagVisibleString    = 0x1a
-	TagGeneralString    = 0x1b
-	TagUniversalString  = 0x1c
-	TagCharacterString  = 0x1d
-	TagBMPString        = 0x1e
-	TagBitmask          = 0x1f // xxx11111b
+	TagEOC              Tag = 0x00
+	TagBoolean          Tag = 0x01
+	TagInteger          Tag = 0x02
+	TagBitString        Tag = 0x03
+	TagOctetString      Tag = 0x04
+	TagNULL             Tag = 0x05
+	TagObjectIdentifier Tag = 0x06
+	TagObjectDescriptor Tag = 0x07
+	TagExternal         Tag = 0x08
+	TagRealFloat        Tag = 0x09
+	TagEnumerated       Tag = 0x0a
+	TagEmbeddedPDV      Tag = 0x0b
+	TagUTF8String       Tag = 0x0c
+	TagRelativeOID      Tag = 0x0d
+	TagSequence         Tag = 0x10
+	TagSet              Tag = 0x11
+	TagNumericString    Tag = 0x12
+	TagPrintableString  Tag = 0x13
+	TagT61String        Tag = 0x14
+	TagVideotexString   Tag = 0x15
+	TagIA5String        Tag = 0x16
+	TagUTCTime          Tag = 0x17
+	TagGeneralizedTime  Tag = 0x18
+	TagGraphicString    Tag = 0x19
+	TagVisibleString    Tag = 0x1a
+	TagGeneralString    Tag = 0x1b
+	TagUniversalString  Tag = 0x1c
+	TagCharacterString  Tag = 0x1d
+	TagBMPString        Tag = 0x1e
+	TagBitmask          Tag = 0x1f // xxx11111b
 )
 
-var tagMap = map[uint8]string{
+var tagMap = map[Tag]string{
 	TagEOC:              "EOC (End-of-Content)",
 	TagBoolean:          "Boolean",
 	TagInteger:          "Integer",
@@ -84,28 +86,32 @@ var tagMap = map[uint8]string{
 	TagBMPString:        "BMP String",
 }
 
+type Class uint8
+
 const (
-	ClassUniversal   = 0   // 00xxxxxxb
-	ClassApplication = 64  // 01xxxxxxb
-	ClassContext     = 128 // 10xxxxxxb
-	ClassPrivate     = 192 // 11xxxxxxb
-	ClassBitmask     = 192 // 11xxxxxxb
+	ClassUniversal   Class = 0   // 00xxxxxxb
+	ClassApplication Class = 64  // 01xxxxxxb
+	ClassContext     Class = 128 // 10xxxxxxb
+	ClassPrivate     Class = 192 // 11xxxxxxb
+	ClassBitmask     Class = 192 // 11xxxxxxb
 )
 
-var ClassMap = map[uint8]string{
+var ClassMap = map[Class]string{
 	ClassUniversal:   "Universal",
 	ClassApplication: "Application",
 	ClassContext:     "Context",
 	ClassPrivate:     "Private",
 }
 
+type Type uint8
+
 const (
-	TypePrimitive   = 0  // xx0xxxxxb
-	TypeConstructed = 32 // xx1xxxxxb
-	TypeBitmask     = 32 // xx1xxxxxb
+	TypePrimitive   Type = 0  // xx0xxxxxb
+	TypeConstructed Type = 32 // xx1xxxxxb
+	TypeBitmask     Type = 32 // xx1xxxxxb
 )
 
-var TypeMap = map[uint8]string{
+var TypeMap = map[Type]string{
 	TypePrimitive:   "Primitive",
 	TypeConstructed: "Constructed",
 }
@@ -313,9 +319,9 @@ func decodePacket(data []byte) (*Packet, []byte) {
 
 	p := new(Packet)
 
-	p.ClassType = data[0] & ClassBitmask
-	p.TagType = data[0] & TypeBitmask
-	p.Tag = data[0] & TagBitmask
+	p.ClassType = Class(data[0]) & ClassBitmask
+	p.TagType = Type(data[0]) & TypeBitmask
+	p.Tag = Tag(data[0]) & TagBitmask
 
 	var datalen int
 	l := data[1]
@@ -408,7 +414,7 @@ func decodePacket(data []byte) (*Packet, []byte) {
 func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 
-	out.Write([]byte{p.ClassType | p.TagType | p.Tag})
+	out.Write([]byte{byte(p.ClassType) | byte(p.TagType) | byte(p.Tag)})
 	packet_length := encodeInteger(int64(p.Data.Len()))
 
 	if p.Data.Len() > 127 || len(packet_length) > 1 {
@@ -428,7 +434,7 @@ func (p *Packet) AppendChild(child *Packet) {
 	p.Children = append(p.Children, child)
 }
 
-func Encode(ClassType, TagType, Tag uint8, Value interface{}, Description string) *Packet {
+func Encode(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {
 	p := new(Packet)
 
 	p.ClassType = ClassType
@@ -463,7 +469,7 @@ func NewSequence(Description string) *Packet {
 	return Encode(ClassUniversal, TypeConstructed, TagSequence, nil, Description)
 }
 
-func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *Packet {
+func NewBoolean(ClassType Class, TagType Type, Tag Tag, Value bool, Description string) *Packet {
 	intValue := int64(0)
 
 	if Value {
@@ -478,7 +484,7 @@ func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *
 	return p
 }
 
-func NewInteger(ClassType, TagType, Tag uint8, Value int64, Description string) *Packet {
+func NewInteger(ClassType Class, TagType Type, Tag Tag, Value int64, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
@@ -487,7 +493,7 @@ func NewInteger(ClassType, TagType, Tag uint8, Value int64, Description string) 
 	return p
 }
 
-func NewString(ClassType, TagType, Tag uint8, Value, Description string) *Packet {
+func NewString(ClassType Class, TagType Type, Tag Tag, Value, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
