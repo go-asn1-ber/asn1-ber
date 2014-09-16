@@ -256,11 +256,7 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 }
 
 func DecodeString(data []byte) (ret string) {
-	for _, c := range data {
-		ret += fmt.Sprintf("%c", c)
-	}
-
-	return
+	ret = string(data)
 }
 
 func DecodeInteger(data []byte) (ret uint64) {
