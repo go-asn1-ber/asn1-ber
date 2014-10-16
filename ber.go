@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 )
 
 type Packet struct {
-	ClassType   uint8
-	TagType     uint8
-	Tag         uint8
+	ClassType   Class
+	TagType     Type
+	Tag         Tag
 	Value       interface{}
 	ByteValue   []byte
 	Data        *bytes.Buffer
@@ -18,40 +19,42 @@ type Packet struct {
 	Description string
 }
 
+type Tag uint8
+
 const (
-	TagEOC              = 0x00
-	TagBoolean          = 0x01
-	TagInteger          = 0x02
-	TagBitString        = 0x03
-	TagOctetString      = 0x04
-	TagNULL             = 0x05
-	TagObjectIdentifier = 0x06
-	TagObjectDescriptor = 0x07
-	TagExternal         = 0x08
-	TagRealFloat        = 0x09
-	TagEnumerated       = 0x0a
-	TagEmbeddedPDV      = 0x0b
-	TagUTF8String       = 0x0c
-	TagRelativeOID      = 0x0d
-	TagSequence         = 0x10
-	TagSet              = 0x11
-	TagNumericString    = 0x12
-	TagPrintableString  = 0x13
-	TagT61String        = 0x14
-	TagVideotexString   = 0x15
-	TagIA5String        = 0x16
-	TagUTCTime          = 0x17
-	TagGeneralizedTime  = 0x18
-	TagGraphicString    = 0x19
-	TagVisibleString    = 0x1a
-	TagGeneralString    = 0x1b
-	TagUniversalString  = 0x1c
-	TagCharacterString  = 0x1d
-	TagBMPString        = 0x1e
-	TagBitmask          = 0x1f // xxx11111b
+	TagEOC              Tag = 0x00
+	TagBoolean          Tag = 0x01
+	TagInteger          Tag = 0x02
+	TagBitString        Tag = 0x03
+	TagOctetString      Tag = 0x04
+	TagNULL             Tag = 0x05
+	TagObjectIdentifier Tag = 0x06
+	TagObjectDescriptor Tag = 0x07
+	TagExternal         Tag = 0x08
+	TagRealFloat        Tag = 0x09
+	TagEnumerated       Tag = 0x0a
+	TagEmbeddedPDV      Tag = 0x0b
+	TagUTF8String       Tag = 0x0c
+	TagRelativeOID      Tag = 0x0d
+	TagSequence         Tag = 0x10
+	TagSet              Tag = 0x11
+	TagNumericString    Tag = 0x12
+	TagPrintableString  Tag = 0x13
+	TagT61String        Tag = 0x14
+	TagVideotexString   Tag = 0x15
+	TagIA5String        Tag = 0x16
+	TagUTCTime          Tag = 0x17
+	TagGeneralizedTime  Tag = 0x18
+	TagGraphicString    Tag = 0x19
+	TagVisibleString    Tag = 0x1a
+	TagGeneralString    Tag = 0x1b
+	TagUniversalString  Tag = 0x1c
+	TagCharacterString  Tag = 0x1d
+	TagBMPString        Tag = 0x1e
+	TagBitmask          Tag = 0x1f // xxx11111b
 )
 
-var TagMap = map[uint8]string{
+var tagMap = map[Tag]string{
 	TagEOC:              "EOC (End-of-Content)",
 	TagBoolean:          "Boolean",
 	TagInteger:          "Integer",
@@ -83,35 +86,39 @@ var TagMap = map[uint8]string{
 	TagBMPString:        "BMP String",
 }
 
+type Class uint8
+
 const (
-	ClassUniversal   = 0   // 00xxxxxxb
-	ClassApplication = 64  // 01xxxxxxb
-	ClassContext     = 128 // 10xxxxxxb
-	ClassPrivate     = 192 // 11xxxxxxb
-	ClassBitmask     = 192 // 11xxxxxxb
+	ClassUniversal   Class = 0   // 00xxxxxxb
+	ClassApplication Class = 64  // 01xxxxxxb
+	ClassContext     Class = 128 // 10xxxxxxb
+	ClassPrivate     Class = 192 // 11xxxxxxb
+	ClassBitmask     Class = 192 // 11xxxxxxb
 )
 
-var ClassMap = map[uint8]string{
+var ClassMap = map[Class]string{
 	ClassUniversal:   "Universal",
 	ClassApplication: "Application",
 	ClassContext:     "Context",
 	ClassPrivate:     "Private",
 }
 
+type Type uint8
+
 const (
-	TypePrimitive   = 0  // xx0xxxxxb
-	TypeConstructed = 32 // xx1xxxxxb
-	TypeBitmask     = 32 // xx1xxxxxb
+	TypePrimitive   Type = 0  // xx0xxxxxb
+	TypeConstructed Type = 32 // xx1xxxxxb
+	TypeBitmask     Type = 32 // xx1xxxxxb
 )
 
-var TypeMap = map[uint8]string{
-	TypePrimitive:   "Primative",
+var TypeMap = map[Type]string{
+	TypePrimitive:   "Primitive",
 	TypeConstructed: "Constructed",
 }
 
 var Debug bool = false
 
-func PrintBytes(buf []byte, indent string) {
+func PrintBytes(out io.Writer, buf []byte, indent string) {
 	data_lines := make([]string, (len(buf)/30)+1)
 	num_lines := make([]string, (len(buf)/30)+1)
 
@@ -121,16 +128,16 @@ func PrintBytes(buf []byte, indent string) {
 	}
 
 	for i := 0; i < len(data_lines); i++ {
-		fmt.Print(indent + data_lines[i] + "\n")
-		fmt.Print(indent + num_lines[i] + "\n\n")
+		out.Write([]byte(indent + data_lines[i] + "\n"))
+		out.Write([]byte(indent + num_lines[i] + "\n\n"))
 	}
 }
 
 func PrintPacket(p *Packet) {
-	printPacket(p, 0, false)
+	printPacket(os.Stdout, p, 0, false)
 }
 
-func printPacket(p *Packet, indent int, printBytes bool) {
+func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
 	indent_str := ""
 
 	for len(indent_str) != indent {
@@ -144,7 +151,7 @@ func printPacket(p *Packet, indent int, printBytes bool) {
 	tag_str := fmt.Sprintf("0x%02X", p.Tag)
 
 	if p.ClassType == ClassUniversal {
-		tag_str = TagMap[p.Tag]
+		tag_str = tagMap[p.Tag]
 	}
 
 	value := fmt.Sprint(p.Value)
@@ -154,18 +161,18 @@ func printPacket(p *Packet, indent int, printBytes bool) {
 		description = p.Description + ": "
 	}
 
-	fmt.Printf("%s%s(%s, %s, %s) Len=%d %q\n", indent_str, description, class_str, tagtype_str, tag_str, p.Data.Len(), value)
+	fmt.Fprintf(out, "%s%s(%s, %s, %s) Len=%d %q\n", indent_str, description, class_str, tagtype_str, tag_str, p.Data.Len(), value)
 
 	if printBytes {
-		PrintBytes(p.Bytes(), indent_str)
+		PrintBytes(out, p.Bytes(), indent_str)
 	}
 
 	for _, child := range p.Children {
-		printPacket(child, indent+1, printBytes)
+		printPacket(out, child, indent+1, printBytes)
 	}
 }
 
-func resizeBuffer(in []byte, new_size uint64) (out []byte) {
+func resizeBuffer(in []byte, new_size int) (out []byte) {
 	out = make([]byte, new_size)
 
 	copy(out, in)
@@ -173,59 +180,53 @@ func resizeBuffer(in []byte, new_size uint64) (out []byte) {
 	return
 }
 
-func readBytes(reader io.Reader, buf []byte) error {
-	idx := 0
-	buflen := len(buf)
-
-	for idx < buflen {
-		n, err := reader.Read(buf[idx:])
-		if err != nil {
-			return err
-		}
-		idx += n
-	}
-
-	return nil
-}
-
 func ReadPacket(reader io.Reader) (*Packet, error) {
-	buf := make([]byte, 2)
-
-	err := readBytes(reader, buf)
+	var header [2]byte
+	buf := header[:]
+	_, err := io.ReadFull(reader, buf)
 
 	if err != nil {
 		return nil, err
 	}
 
-	idx := uint64(2)
-	datalen := uint64(buf[1])
+	idx := 2
+	var datalen int
+	l := buf[1]
 
-	if Debug {
-		fmt.Printf("Read: datalen = %d len(buf) = %d ", datalen, len(buf))
+	if l&0x80 == 0 {
+		// The length is encoded in the bottom 7 bits.
+		datalen = int(l & 0x7f)
+		if Debug {
+			fmt.Printf("Read: datalen = %d len(buf) = %d\n  ", l, len(buf))
 
-		for _, b := range buf {
-			fmt.Printf("%02X ", b)
+			for _, b := range buf {
+				fmt.Printf("%02X ", b)
+			}
+
+			fmt.Printf("\n")
 		}
-
-		fmt.Printf("\n")
-	}
-
-	if datalen&128 != 0 {
-		a := datalen - 128
-
-		idx += a
-		buf = resizeBuffer(buf, 2+a)
-
-		err := readBytes(reader, buf[2:])
+	} else {
+		// Bottom 7 bits give the number of length bytes to follow.
+		numBytes := int(l & 0x7f)
+		if numBytes == 0 {
+			return nil, fmt.Errorf("invalid length found")
+		}
+		idx += numBytes
+		buf = resizeBuffer(buf, 2+numBytes)
+		_, err := io.ReadFull(reader, buf[2:])
 
 		if err != nil {
 			return nil, err
 		}
-
-		datalen = DecodeInteger(buf[2 : 2+a])
+		datalen = 0
+		for i := 0; i < numBytes; i++ {
+			b := buf[2+i]
+			datalen <<= 8
+			datalen |= int(b)
+		}
 
 		if Debug {
-			fmt.Printf("Read: a = %d  idx = %d  datalen = %d  len(buf) = %d", a, idx, datalen, len(buf))
+			fmt.Printf("Read: datalen = %d numbytes=%d len(buf) = %d\n  ", datalen, numBytes, len(buf))
 
 			for _, b := range buf {
 				fmt.Printf("%02X ", b)
@@ -236,61 +237,73 @@ func ReadPacket(reader io.Reader) (*Packet, error) {
 	}
 
 	buf = resizeBuffer(buf, idx+datalen)
-	err = readBytes(reader, buf[idx:])
+	_, err = io.ReadFull(reader, buf[idx:])
 
 	if err != nil {
 		return nil, err
 	}
 
 	if Debug {
-		fmt.Printf("Read: len( buf ) = %d  idx=%d datalen=%d idx+datalen=%d\n", len(buf), idx, datalen, idx+datalen)
+		fmt.Printf("Read: len( buf ) = %d  idx=%d datalen=%d idx+datalen=%d\n  ", len(buf), idx, datalen, idx+datalen)
 
 		for _, b := range buf {
 			fmt.Printf("%02X ", b)
 		}
 	}
 
-	p := DecodePacket(buf)
+	p, _ := decodePacket(buf)
 
 	return p, nil
 }
 
-func DecodeString(data []byte) (ret string) {
-	ret = string(data)
+func DecodeString(data []byte) string {
+	return string(data)
 }
 
-func DecodeInteger(data []byte) (ret uint64) {
-	for _, i := range data {
-		ret = ret * 256
-		ret = ret + uint64(i)
+func parseInt64(bytes []byte) (ret int64, err error) {
+	if len(bytes) > 8 {
+		// We'll overflow an int64 in this case.
+		err = fmt.Errorf("integer too large")
+		return
+	}
+	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
+		ret <<= 8
+		ret |= int64(bytes[bytesRead])
 	}
 
+	// Shift up and down in order to sign extend the result.
+	ret <<= 64 - uint8(len(bytes))*8
+	ret >>= 64 - uint8(len(bytes))*8
 	return
 }
 
-func EncodeInteger(val uint64) []byte {
-	var out bytes.Buffer
+func encodeInteger(i int64) []byte {
+	n := int64Length(i)
+	out := make([]byte, n)
 
-	found := false
-
-	shift := uint(56)
-
-	mask := uint64(0xFF00000000000000)
-
-	for mask > 0 {
-		if !found && (val&mask != 0) {
-			found = true
-		}
-
-		if found || (shift == 0) {
-			out.Write([]byte{byte((val & mask) >> shift)})
-		}
-
-		shift -= 8
-		mask = mask >> 8
+	var j int
+	for ; n > 0; n-- {
+		out[j] = (byte(i >> uint((n-1)*8)))
+		j++
 	}
 
-	return out.Bytes()
+	return out
+}
+
+func int64Length(i int64) (numBytes int) {
+	numBytes = 1
+
+	for i > 127 {
+		numBytes++
+		i >>= 8
+	}
+
+	for i < -128 {
+		numBytes++
+		i >>= 8
+	}
+
+	return
 }
 
 func DecodePacket(data []byte) *Packet {
@@ -306,17 +319,29 @@ func decodePacket(data []byte) (*Packet, []byte) {
 
 	p := new(Packet)
 
-	p.ClassType = data[0] & ClassBitmask
-	p.TagType = data[0] & TypeBitmask
-	p.Tag = data[0] & TagBitmask
+	p.ClassType = Class(data[0]) & ClassBitmask
+	p.TagType = Type(data[0]) & TypeBitmask
+	p.Tag = Tag(data[0]) & TagBitmask
 
-	datalen := DecodeInteger(data[1:2])
-	datapos := uint64(2)
-
-	if datalen&128 != 0 {
-		datalen -= 128
-		datapos += datalen
-		datalen = DecodeInteger(data[2 : 2+datalen])
+	var datalen int
+	l := data[1]
+	datapos := 2
+	if l&0x80 == 0 {
+		// The length is encoded in the bottom 7 bits.
+		datalen = int(l & 0x7f)
+	} else {
+		// Bottom 7 bits give the number of length bytes to follow.
+		numBytes := int(l & 0x7f)
+		if numBytes == 0 {
+			return nil, nil
+		}
+		datapos += numBytes
+		datalen = 0
+		for i := 0; i < numBytes; i++ {
+			b := data[2+i]
+			datalen <<= 8
+			datalen |= int(b)
+		}
 	}
 
 	p.Data = new(bytes.Buffer)
@@ -341,13 +366,16 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		switch p.Tag {
 		case TagEOC:
 		case TagBoolean:
-			val := DecodeInteger(value_data)
+			val, _ := parseInt64(value_data)
 
 			p.Value = val != 0
 		case TagInteger:
-			p.Value = DecodeInteger(value_data)
+			p.Value, _ = parseInt64(value_data)
 		case TagBitString:
 		case TagOctetString:
+			// the actual string encoding is not known here
+			// (e.g. for LDAP value_data is already an UTF8-encoded
+			// string). Return the data without further processing
 			p.Value = DecodeString(value_data)
 		case TagNULL:
 		case TagObjectIdentifier:
@@ -355,7 +383,7 @@ func decodePacket(data []byte) (*Packet, []byte) {
 		case TagExternal:
 		case TagRealFloat:
 		case TagEnumerated:
-			p.Value = DecodeInteger(value_data)
+			p.Value, _ = parseInt64(value_data)
 		case TagEmbeddedPDV:
 		case TagUTF8String:
 		case TagRelativeOID:
@@ -383,17 +411,13 @@ func decodePacket(data []byte) (*Packet, []byte) {
 	return p, data[datapos+datalen:]
 }
 
-func (p *Packet) DataLength() uint64 {
-	return uint64(p.Data.Len())
-}
-
 func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 
-	out.Write([]byte{p.ClassType | p.TagType | p.Tag})
-	packet_length := EncodeInteger(p.DataLength())
+	out.Write([]byte{byte(p.ClassType) | byte(p.TagType) | byte(p.Tag)})
+	packet_length := encodeInteger(int64(p.Data.Len()))
 
-	if p.DataLength() > 127 || len(packet_length) > 1 {
+	if p.Data.Len() > 127 || len(packet_length) > 1 {
 		out.Write([]byte{byte(len(packet_length) | 128)})
 		out.Write(packet_length)
 	} else {
@@ -407,19 +431,10 @@ func (p *Packet) Bytes() []byte {
 
 func (p *Packet) AppendChild(child *Packet) {
 	p.Data.Write(child.Bytes())
-
-	if len(p.Children) == cap(p.Children) {
-		newChildren := make([]*Packet, cap(p.Children)*2)
-
-		copy(newChildren, p.Children)
-		p.Children = newChildren[0:len(p.Children)]
-	}
-
-	p.Children = p.Children[0 : len(p.Children)+1]
-	p.Children[len(p.Children)-1] = child
+	p.Children = append(p.Children, child)
 }
 
-func Encode(ClassType, TagType, Tag uint8, Value interface{}, Description string) *Packet {
+func Encode(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {
 	p := new(Packet)
 
 	p.ClassType = ClassType
@@ -451,11 +466,11 @@ func Encode(ClassType, TagType, Tag uint8, Value interface{}, Description string
 }
 
 func NewSequence(Description string) *Packet {
-	return Encode(ClassUniversal, TypePrimitive, TagSequence, nil, Description)
+	return Encode(ClassUniversal, TypeConstructed, TagSequence, nil, Description)
 }
 
-func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *Packet {
-	intValue := 0
+func NewBoolean(ClassType Class, TagType Type, Tag Tag, Value bool, Description string) *Packet {
+	intValue := int64(0)
 
 	if Value {
 		intValue = 1
@@ -464,21 +479,46 @@ func NewBoolean(ClassType, TagType, Tag uint8, Value bool, Description string) *
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
-	p.Data.Write(EncodeInteger(uint64(intValue)))
+	p.Data.Write(encodeInteger(intValue))
 
 	return p
 }
 
-func NewInteger(ClassType, TagType, Tag uint8, Value uint64, Description string) *Packet {
+func NewInteger(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
-	p.Data.Write(EncodeInteger(Value))
+	switch v := Value.(type) {
+	case int:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint:
+		p.Data.Write(encodeInteger(int64(v)))
+	case int64:
+		p.Data.Write(encodeInteger(v))
+	case uint64:
+		// TODO : check range or add encodeUInt...
+		p.Data.Write(encodeInteger(int64(v)))
+	case int32:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint32:
+		p.Data.Write(encodeInteger(int64(v)))
+	case int16:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint16:
+		p.Data.Write(encodeInteger(int64(v)))
+	case int8:
+		p.Data.Write(encodeInteger(int64(v)))
+	case uint8:
+		p.Data.Write(encodeInteger(int64(v)))
+	default:
+		// TODO : add support for big.Int ?
+		panic(fmt.Sprintf("Invalid type %T, expected {u|}int{64|32|16|8}", v))
+	}
 
 	return p
 }
 
-func NewString(ClassType, TagType, Tag uint8, Value, Description string) *Packet {
+func NewString(ClassType Class, TagType Type, Tag Tag, Value, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
