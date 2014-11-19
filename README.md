@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/github.com/go-asn1-ber/asn1-ber?status.svg)](https://godoc.org/github.com/go-asn1-ber/asn1-ber) [![Build Status](https://travis-ci.org/go-asn1-ber/asn1-ber.svg)](https://travis-ci.org/go-asn1-ber/asn1-ber)
+[![GoDoc](https://godoc.org/gopkg.in/asn1-ber.v1?status.svg)](https://godoc.org/gopkg.in/asn1-ber.v1) [![Build Status](https://travis-ci.org/go-asn1-ber/asn1-ber.svg)](https://travis-ci.org/go-asn1-ber/asn1-ber)
 
 
 ASN1 BER Encoding / Decoding Library for the GO programming language.
