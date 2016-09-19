@@ -70,18 +70,14 @@ func TestReadLength(t *testing.T) {
 		},
 		"long-definite-form max length": {
 			Data: []byte{
-				LengthLongFormBitmask | 8,
+				LengthLongFormBitmask | 4,
 				0x7F,
 				0xFF,
 				0xFF,
 				0xFF,
-				0xFF,
-				0xFF,
-				0xFF,
-				0xFF,
 			},
-			ExpectedLength:    math.MaxInt64,
-			ExpectedBytesRead: 9,
+			ExpectedLength:    math.MaxInt32,
+			ExpectedBytesRead: 5,
 		},
 	}
 
@@ -134,14 +130,10 @@ func TestEncodeLength(t *testing.T) {
 		},
 
 		"max long-form length": {
-			Length: math.MaxInt64,
+			Length: math.MaxInt32,
 			ExpectedBytes: []byte{
-				LengthLongFormBitmask | 8,
+				LengthLongFormBitmask | 4,
 				0x7F,
-				0xFF,
-				0xFF,
-				0xFF,
-				0xFF,
 				0xFF,
 				0xFF,
 				0xFF,
