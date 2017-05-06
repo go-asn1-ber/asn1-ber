@@ -11,7 +11,7 @@ func TestReadLength(t *testing.T) {
 	testcases := map[string]struct {
 		Data []byte
 
-		ExpectedLength    int
+		ExpectedLength    int64
 		ExpectedBytesRead int
 		ExpectedError     string
 	}{
@@ -112,7 +112,7 @@ func TestReadLength(t *testing.T) {
 
 func TestEncodeLength(t *testing.T) {
 	testcases := map[string]struct {
-		Length        int
+		Length        int64
 		ExpectedBytes []byte
 	}{
 		"0": {
