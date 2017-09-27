@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"math"
 	"testing"
 )
 
@@ -79,6 +80,16 @@ var testcases = []struct {
 	{File: "tests/tc47.ber", Error: "eoc child not allowed with definite length"},
 	{File: "tests/tc48.ber", Error: "", IndefiniteEncoding: true}, // Error: "Using of more than 7 "unused bits" in BIT STRING with constrictive encoding form"
 	{File: "tests/tc49.ber", Error: ""},
+	{File: "tests/tc50.ber", Error: is64bit("length cannot be less than -1", "long-form length overflow")},
+}
+
+func is64bit(a, b string) string {
+	maxInt64 := int64(math.MaxInt64)
+	length := int(maxInt64)
+	if int64(length) != maxInt64 {
+		return b
+	}
+	return a
 }
 
 func TestSuiteDecodePacket(t *testing.T) {
