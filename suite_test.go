@@ -78,6 +78,7 @@ var testcases = []struct {
 	{File: "tests/tc46.ber", Error: "indefinite length used with primitive type"},
 	{File: "tests/tc47.ber", Error: "eoc child not allowed with definite length"},
 	{File: "tests/tc48.ber", Error: "", IndefiniteEncoding: true}, // Error: "Using of more than 7 "unused bits" in BIT STRING with constrictive encoding form"
+	{File: "tests/tc49.ber", Error: ""},
 }
 
 func TestSuiteDecodePacket(t *testing.T) {
@@ -114,7 +115,7 @@ func TestSuiteDecodePacket(t *testing.T) {
 			}
 		} else if !bytes.Equal(dataOut, dataIn) {
 			// Make sure the serialized data matches the source
-			t.Errorf("%s: data should be the same", file)
+			t.Errorf("%s: data should be the same\nwant: %#v\ngot: %#v", file, dataIn, dataOut)
 		}
 
 		packet, err = DecodePacketErr(dataOut)
@@ -126,7 +127,7 @@ func TestSuiteDecodePacket(t *testing.T) {
 		// Make sure the re-serialized data matches our original serialization
 		dataOut2 := packet.Bytes()
 		if !bytes.Equal(dataOut, dataOut2) {
-			t.Errorf("%s: data should be the same", file)
+			t.Errorf("%s: data should be the same\nwant: %#v\ngot: %#v", file, dataOut, dataOut2)
 		}
 	}
 }
@@ -164,7 +165,7 @@ func TestSuiteReadPacket(t *testing.T) {
 			}
 		} else if !bytes.Equal(dataOut, dataIn) {
 			// Make sure the serialized data matches the source
-			t.Errorf("%s: data should be the same", file)
+			t.Errorf("%s: data should be the same\nwant: %#v\ngot: %#v", file, dataIn, dataOut)
 		}
 
 		packet, err = DecodePacketErr(dataOut)
@@ -176,7 +177,7 @@ func TestSuiteReadPacket(t *testing.T) {
 		// Make sure the re-serialized data matches our original serialization
 		dataOut2 := packet.Bytes()
 		if !bytes.Equal(dataOut, dataOut2) {
-			t.Errorf("%s: data should be the same", file)
+			t.Errorf("%s: data should be the same\nwant: %#v\ngot: %#v", file, dataOut, dataOut2)
 		}
 	}
 }

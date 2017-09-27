@@ -2,9 +2,8 @@ package ber
 
 import (
 	"bytes"
-	"math"
-
 	"io"
+	"math"
 	"testing"
 )
 
@@ -16,7 +15,7 @@ func TestEncodeDecodeInteger(t *testing.T) {
 			t.Fatalf("Error decoding %d : %s", v, err)
 		}
 		if v != dec {
-			t.Error("TestEncodeDecodeInteger failed for %d (got %d)", v, dec)
+			t.Errorf("TestEncodeDecodeInteger failed for %d (got %d)", v, dec)
 		}
 
 	}
