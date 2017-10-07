@@ -10,8 +10,8 @@ func TestReadHeader(t *testing.T) {
 	testcases := map[string]struct {
 		Data               []byte
 		ExpectedIdentifier Identifier
-		ExpectedLength     int
-		ExpectedBytesRead  int
+		ExpectedLength     int64
+		ExpectedBytesRead  int64
 		ExpectedError      string
 	}{
 		"empty": {

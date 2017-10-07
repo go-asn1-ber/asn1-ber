@@ -272,7 +272,7 @@ func DecodePacketErr(data []byte) (*Packet, error) {
 }
 
 // readPacket reads a single Packet from the reader, returning the number of bytes read
-func readPacket(reader io.Reader) (*Packet, int, error) {
+func readPacket(reader io.Reader) (*Packet, int64, error) {
 	identifier, length, read, err := readHeader(reader)
 	if err != nil {
 		return nil, read, err
@@ -290,7 +290,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 		// TODO: if universal, ensure tag type is allowed to be constructed
 
 		// Track how much content we've read
-		contentRead := 0
+		var contentRead int64 = 0
 		for {
 			if length != LengthIndefinite {
 				// End if we've read what we've been told to
@@ -330,9 +330,8 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 	}
 
 	// Read definite-length content
-	content := make([]byte, length, length)
 	if length > 0 {
-		_, err := io.ReadFull(reader, content)
+		_, err := io.CopyN(p.Data, reader, length)
 		if err != nil {
 			if err == io.EOF {
 				return nil, read, io.ErrUnexpectedEOF
@@ -343,39 +342,38 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 	}
 
 	if p.ClassType == ClassUniversal {
-		p.Data.Write(content)
-		p.ByteValue = content
+		p.ByteValue = p.Data.Bytes()
 
 		switch p.Tag {
 		case TagEOC:
 		case TagBoolean:
-			val, _ := parseInt64(content)
+			val, _ := parseInt64(p.ByteValue)
 
 			p.Value = val != 0
 		case TagInteger:
-			p.Value, _ = parseInt64(content)
+			p.Value, _ = parseInt64(p.ByteValue)
 		case TagBitString:
 		case TagOctetString:
 			// the actual string encoding is not known here
-			// (e.g. for LDAP content is already an UTF8-encoded
+			// (e.g. for LDAP p.ByteValue is already an UTF8-encoded
 			// string). Return the data without further processing
-			p.Value = DecodeString(content)
+			p.Value = DecodeString(p.ByteValue)
 		case TagNULL:
 		case TagObjectIdentifier:
 		case TagObjectDescriptor:
 		case TagExternal:
 		case TagRealFloat:
 		case TagEnumerated:
-			p.Value, _ = parseInt64(content)
+			p.Value, _ = parseInt64(p.ByteValue)
 		case TagEmbeddedPDV:
 		case TagUTF8String:
-			p.Value = DecodeString(content)
+			p.Value = DecodeString(p.ByteValue)
 		case TagRelativeOID:
 		case TagSequence:
 		case TagSet:
 		case TagNumericString:
 		case TagPrintableString:
-			p.Value = DecodeString(content)
+			p.Value = DecodeString(p.ByteValue)
 		case TagT61String:
 		case TagVideotexString:
 		case TagIA5String:
@@ -388,8 +386,6 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 		case TagCharacterString:
 		case TagBMPString:
 		}
-	} else {
-		p.Data.Write(content)
 	}
 
 	return p, read, nil
