@@ -85,7 +85,8 @@ func ParseGeneralizedTime(v []byte) (time.Time, error) {
 			return zeroTime, ErrInvalidTimeFormat
 		}
 	case 3:
-		format += `07`
+		format += `0700`
+		str = append(str, []byte("00")...)
 	case 5:
 		format += `0700`
 	default:
@@ -94,7 +95,7 @@ func ParseGeneralizedTime(v []byte) (time.Time, error) {
 
 	t, err := time.Parse(format, string(str))
 	if err != nil {
-		return zeroTime, ErrInvalidTimeFormat
+		return zeroTime, fmt.Errorf("%s: %s", ErrInvalidTimeFormat, err)
 	}
 	return t.Add(fract), nil
 }
