@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"reflect"
+	"time"
 )
 
 // MaxPacketLengthBytes specifies the maximum allowed packet size when calling ReadPacket or DecodePacket. Set to 0 for
@@ -389,6 +390,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 		case TagIA5String:
 		case TagUTCTime:
 		case TagGeneralizedTime:
+			p.Value, err = ParseGeneralizedTime(content)
 		case TagGraphicString:
 		case TagVisibleString:
 		case TagGeneralString:
@@ -507,6 +509,20 @@ func NewString(ClassType Class, TagType Type, Tag Tag, Value, Description string
 
 	p.Value = Value
 	p.Data.Write([]byte(Value))
+
+	return p
+}
+
+func NewGeneralizedTime(ClassType Class, TagType Type, Tag Tag, Value time.Time, Description string) *Packet {
+	p := Encode(ClassType, TagType, Tag, nil, Description)
+	var s string
+	if Value.Nanosecond() != 0 {
+		s = Value.Format(`20060102150405.000000Z`) // FIXME how many fractional?
+	} else {
+		s = Value.Format(`20060102150405Z`)
+	}
+	p.Value = s
+	p.Data.Write([]byte(s))
 
 	return p
 }
