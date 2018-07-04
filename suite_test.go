@@ -30,18 +30,18 @@ var testcases = []struct {
 	{File: "tests/tc4.ber", Error: "invalid length byte 0xff"},
 	{File: "tests/tc5.ber", Error: "", AbnormalEncoding: true},
 	// Real numbers (some expected failures are disabled until support is added)
-	{File: "tests/tc6.ber", Error: ""}, // Error: "REAL value +0 must be encoded with zero-length value block"},
-	{File: "tests/tc7.ber", Error: ""}, // Error: "REAL value -0 must be encoded as a special value"},
-	{File: "tests/tc8.ber", Error: ""},
-	{File: "tests/tc9.ber", Error: ""}, // Error: "Bits 6 and 5 of information octet for REAL are equal to 11"
+	{File: "tests/tc6.ber", Error: "REAL value +0 must be encoded with zero-length value block"},
+	{File: "tests/tc7.ber", Error: "REAL value -0 must be encoded as a special value"},
+	{File: "tests/tc8.ber", Error: `Encoding of "special value" must not contain exponent and mantissa`},
+	{File: "tests/tc9.ber", Error: "Bits 6 and 5 of information octet for REAL are equal to 11"},
 	{File: "tests/tc10.ber", Error: ""},
-	{File: "tests/tc11.ber", Error: ""}, // Error: "Incorrect NR form"
-	{File: "tests/tc12.ber", Error: ""}, // Error: "Encoding of "special value" not from ASN.1 standard"
+	{File: "tests/tc11.ber", Error: "Incorrect NR form"},
+	{File: "tests/tc12.ber", Error: `Encoding of "special value" not from ASN.1 standard`},
 	{File: "tests/tc13.ber", Error: errEOF},
 	{File: "tests/tc14.ber", Error: errEOF},
-	{File: "tests/tc15.ber", Error: ""}, // Error: "Too big value of exponent"
-	{File: "tests/tc16.ber", Error: ""}, // Error: "Too big value of mantissa"
-	{File: "tests/tc17.ber", Error: ""}, // Error: "Too big values for exponent and mantissa + using of "scaling factor" value"
+	{File: "tests/tc15.ber", Error: "Too big value of exponent"},
+	{File: "tests/tc16.ber", Error: "Too big value of mantissa"},
+	{File: "tests/tc17.ber", Error: "Too big value of exponent"}, // Error: "Too big values for exponent and mantissa + using of "scaling factor" value"
 	// Integers
 	{File: "tests/tc18.ber", Error: ""},
 	{File: "tests/tc19.ber", Error: errEOF},
