@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"reflect"
 )
 
@@ -159,8 +160,12 @@ func PrintBytes(out io.Writer, buf []byte, indent string) {
 	}
 }
 
-func PrintPacket(out io.Writer, p *Packet) {
+func WritePacket(out io.Writer, p *Packet) {
 	printPacket(out, p, 0, false)
+}
+
+func PrintPacket(p *Packet) {
+	printPacket(os.Stdout, p, 0, false)
 }
 
 func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
