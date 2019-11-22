@@ -161,6 +161,10 @@ func PrintBytes(out io.Writer, buf []byte, indent string) {
 	}
 }
 
+func WritePacket(out io.Writer, p *Packet) {
+	printPacket(out, p, 0, false)
+}
+
 func PrintPacket(p *Packet) {
 	printPacket(os.Stdout, p, 0, false)
 }
