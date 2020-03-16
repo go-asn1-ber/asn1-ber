@@ -473,14 +473,14 @@ func NewBoolean(ClassType Class, TagType Type, Tag Tag, Value bool, Description 
 }
 
 // NewLDAPBoolean returns a RFC 4511-compliant Boolean packet
-func NewLDAPBoolean(Value bool, Description string) *Packet {
+func NewLDAPBoolean(ClassType Class, TagType Type, Tag Tag, Value bool, Description string) *Packet {
 	intValue := int64(0)
 
 	if Value {
 		intValue = 255
 	}
 
-	p := Encode(ClassUniversal, TypePrimitive, TagBoolean, nil, Description)
+	p := Encode(ClassType, TagType, Tag, nil, Description)
 
 	p.Value = Value
 	p.Data.Write(encodeInteger(intValue))

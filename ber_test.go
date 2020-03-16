@@ -45,7 +45,7 @@ func TestBoolean(t *testing.T) {
 func TestLDAPBoolean(t *testing.T) {
 	var value bool = true
 
-	packet := NewLDAPBoolean(value, "first Packet, True")
+	packet := NewLDAPBoolean(ClassUniversal, TypePrimitive, TagBoolean, value, "first Packet, True")
 
 	newBoolean, ok := packet.Value.(bool)
 	if !ok || newBoolean != value {
