@@ -446,10 +446,32 @@ func Encode(ClassType Class, TagType Type, Tag Tag, Value interface{}, Descripti
 				if ok {
 					p.Data.Write([]byte(sv))
 				}
+			case TagEnumerated:
+				bv, ok := v.Interface().([]byte)
+				if ok {
+					p.Data.Write(bv)
+				}
+			case TagEmbeddedPDV:
+				bv, ok := v.Interface().([]byte)
+				if ok {
+					p.Data.Write(bv)
+				}
+			}
+		} else if ClassType == ClassContext {
+			switch Tag {
+			case TagEnumerated:
+				bv, ok := v.Interface().([]byte)
+				if ok {
+					p.Data.Write(bv)
+				}
+			case TagEmbeddedPDV:
+				bv, ok := v.Interface().([]byte)
+				if ok {
+					p.Data.Write(bv)
+				}
 			}
 		}
 	}
-
 	return p
 }
 
