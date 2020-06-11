@@ -141,10 +141,11 @@ func TestSequenceAndAppendChild(t *testing.T) {
 
 func TestReadPacket(t *testing.T) {
 	packet := NewString(ClassUniversal, TypePrimitive, TagOctetString, "Ad impossibilia nemo tenetur", "string")
-	var buffer io.ReadWriter
-	buffer = new(bytes.Buffer)
+	var buffer io.ReadWriter = new(bytes.Buffer)
 
-	buffer.Write(packet.Bytes())
+	if _, err := buffer.Write(packet.Bytes()); err != nil {
+		t.Error("error writing packet", err)
+	}
 
 	newPacket, err := ReadPacket(buffer)
 	if err != nil {

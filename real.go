@@ -34,7 +34,6 @@ func encodeFloat(v float64) []byte {
 		ret = append(ret, []byte(value)...)
 		return ret
 	}
-	return []byte{}
 }
 
 func ParseReal(v []byte) (val float64, err error) {

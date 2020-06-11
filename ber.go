@@ -157,8 +157,8 @@ func PrintBytes(out io.Writer, buf []byte, indent string) {
 	}
 
 	for i := 0; i < len(data_lines); i++ {
-		out.Write([]byte(indent + data_lines[i] + "\n"))
-		out.Write([]byte(indent + num_lines[i] + "\n\n"))
+		_, _ = out.Write([]byte(indent + data_lines[i] + "\n"))
+		_, _ = out.Write([]byte(indent + num_lines[i] + "\n\n"))
 	}
 }
 
@@ -344,7 +344,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 	if MaxPacketLengthBytes > 0 && int64(length) > MaxPacketLengthBytes {
 		return nil, read, fmt.Errorf("length %d greater than maximum %d", length, MaxPacketLengthBytes)
 	}
-	content := make([]byte, length, length)
+	content := make([]byte, length)
 	if length > 0 {
 		_, err := io.ReadFull(reader, content)
 		if err != nil {
@@ -602,7 +602,7 @@ func NewGeneralizedTime(ClassType Class, TagType Type, Tag Tag, Value time.Time,
 	}
 	p.Value = s
 	p.Data.Write([]byte(s))
-  return p
+	return p
 }
 
 func NewReal(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {

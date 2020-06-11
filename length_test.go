@@ -184,7 +184,7 @@ func TestEncodeLength(t *testing.T) {
 		}
 
 		b := encodeLength(int(tc.Length))
-		if bytes.Compare(tc.ExpectedBytes, b) != 0 {
+		if !bytes.Equal(tc.ExpectedBytes, b) {
 			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.ExpectedBytes, b)
 		}
 	}
