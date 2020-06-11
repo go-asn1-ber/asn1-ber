@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"time"
+	"unicode/utf8"
 )
 
 // MaxPacketLengthBytes specifies the maximum allowed packet size when calling ReadPacket or DecodePacket. Set to 0 for
@@ -383,16 +384,34 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 			p.Value, _ = ParseInt64(content)
 		case TagEmbeddedPDV:
 		case TagUTF8String:
-			p.Value = DecodeString(content)
+			val := DecodeString(content)
+			if !utf8.Valid([]byte(val)) {
+				err = errors.New("invalid UTF-8 string")
+			} else {
+				p.Value = val
+			}
 		case TagRelativeOID:
 		case TagSequence:
 		case TagSet:
 		case TagNumericString:
 		case TagPrintableString:
-			p.Value = DecodeString(content)
+			val := DecodeString(content)
+			if err = isPrintableString(val); err == nil {
+				p.Value = val
+			}
 		case TagT61String:
 		case TagVideotexString:
 		case TagIA5String:
+			val := DecodeString(content)
+			for i, c := range val {
+				if c >= 0x7F {
+					err = fmt.Errorf("invalid character for IA5String at pos %d: %c", i, c)
+					break
+				}
+			}
+			if err == nil {
+				p.Value = val
+			}
 		case TagUTCTime:
 		case TagGeneralizedTime:
 			p.Value, err = ParseGeneralizedTime(content)
@@ -408,6 +427,23 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 	}
 
 	return p, read, err
+}
+
+func isPrintableString(val string) error {
+	for i, c := range val {
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= 'A' && c <= 'Z':
+		case c >= '0' && c <= '9':
+		default:
+			switch c {
+			case '\'', '(', ')', '+', ',', '-', '.', '=', '/', ':', '?', ' ':
+			default:
+				return fmt.Errorf("invalid character in position %d", i)
+			}
+		}
+	}
+	return nil
 }
 
 func (p *Packet) Bytes() []byte {
