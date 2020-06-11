@@ -8,7 +8,7 @@ import (
 )
 
 func TestReadLength(t *testing.T) {
-	testcases := map[string]struct {
+	testCases := map[string]struct {
 		Data []byte
 
 		ExpectedLength    int64
@@ -97,7 +97,7 @@ func TestReadLength(t *testing.T) {
 		},
 	}
 
-	for k, tc := range testcases {
+	for k, tc := range testCases {
 		// Skip tests requiring 64-bit integers on platforms that don't support them
 		if tc.ExpectedLength != int64(int(tc.ExpectedLength)) {
 			continue
@@ -128,7 +128,7 @@ func TestReadLength(t *testing.T) {
 }
 
 func TestEncodeLength(t *testing.T) {
-	testcases := map[string]struct {
+	testCases := map[string]struct {
 		Length        int64
 		ExpectedBytes []byte
 	}{
@@ -177,7 +177,7 @@ func TestEncodeLength(t *testing.T) {
 		},
 	}
 
-	for k, tc := range testcases {
+	for k, tc := range testCases {
 		// Skip tests requiring 64-bit integers on platforms that don't support them
 		if tc.Length != int64(int(tc.Length)) {
 			continue

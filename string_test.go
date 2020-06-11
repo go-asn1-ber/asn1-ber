@@ -21,10 +21,8 @@ func TestIA5String(t *testing.T) {
 			if dec.Value.(string) != test.value {
 				t.Errorf("did not get back original value: %s <=> %s", dec.Value.(string), test.value)
 			}
-		} else {
-			if err.Error() != test.expectedErr {
-				t.Errorf("got unexpected error for `%s`: %s", test.value, err)
-			}
+		} else if err.Error() != test.expectedErr {
+			t.Errorf("got unexpected error for `%s`: %s", test.value, err)
 		}
 	}
 }
@@ -46,10 +44,8 @@ func TestPrintableString(t *testing.T) {
 			if dec.Value.(string) != test.value {
 				t.Errorf("did not get back original value: %s <=> %s", dec.Value.(string), test.value)
 			}
-		} else {
-			if err.Error() != test.expectedErr {
-				t.Errorf("got unexpected error for `%s`: %s", test.value, err)
-			}
+		} else if err.Error() != test.expectedErr {
+			t.Errorf("got unexpected error for `%s`: %s", test.value, err)
 		}
 	}
 }
@@ -71,10 +67,8 @@ func TestUTF8String(t *testing.T) {
 			if dec.Value.(string) != test.value {
 				t.Errorf("did not get back original value: %s <=> %s", dec.Value.(string), test.value)
 			}
-		} else {
-			if err.Error() != test.expectedErr {
-				t.Errorf("got unexpected error for `%s`: %s", test.value, err)
-			}
+		} else if err.Error() != test.expectedErr {
+			t.Errorf("got unexpected error for `%s`: %s", test.value, err)
 		}
 	}
 }

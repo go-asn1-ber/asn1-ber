@@ -31,7 +31,7 @@ func encodeFloat(v float64) []byte {
 		} else {
 			ret = []byte{0x02}
 		}
-		ret = append(ret, []byte(value)...)
+		ret = append(ret, value...)
 		return ret
 	}
 }
@@ -75,7 +75,7 @@ func parseBinaryFloat(v []byte) (float64, error) {
 	case 0x20:
 		base = 16
 	case 0x30:
-		return 0.0, errors.New("Bits 6 and 5 of information octet for REAL are equal to 11")
+		return 0.0, errors.New("bits 6 and 5 of information octet for REAL are equal to 11")
 	}
 
 	scale := uint((info & 0x0c) >> 2)
@@ -91,7 +91,7 @@ func parseBinaryFloat(v []byte) (float64, error) {
 	case 0x03:
 		expLen = int(v[0])
 		if expLen > 8 {
-			return 0.0, errors.New("Too big value of exponent")
+			return 0.0, errors.New("too big value of exponent")
 		}
 		v = v[1:]
 	}
@@ -102,14 +102,14 @@ func parseBinaryFloat(v []byte) (float64, error) {
 	}
 
 	if len(v) > 8 {
-		return 0.0, errors.New("Too big value of mantissa")
+		return 0.0, errors.New("too big value of mantissa")
 	}
 
 	mant, err := ParseInt64(v)
 	if err != nil {
 		return 0.0, err
 	}
-	mantissa := int64(mant) << scale
+	mantissa := mant << scale
 
 	if info&0x40 == 0x40 {
 		mantissa = -mantissa
@@ -127,7 +127,7 @@ func parseDecimalFloat(v []byte) (val float64, err error) {
 	case 0x02, 0x03: // NR form 2, 3
 		val, err = strconv.ParseFloat(strings.Replace(strings.TrimLeft(string(v[1:]), " "), ",", ".", -1), 64)
 	default:
-		err = errors.New("Incorrect NR form")
+		err = errors.New("incorrect NR form")
 	}
 	if err != nil {
 		return 0.0, err
@@ -141,7 +141,7 @@ func parseDecimalFloat(v []byte) (val float64, err error) {
 
 func parseSpecialFloat(v []byte) (float64, error) {
 	if len(v) != 1 {
-		return 0.0, errors.New(`Encoding of "special value" must not contain exponent and mantissa`)
+		return 0.0, errors.New(`encoding of "special value" must not contain exponent and mantissa`)
 	}
 	switch v[0] {
 	case 0x40:
@@ -153,5 +153,5 @@ func parseSpecialFloat(v []byte) (float64, error) {
 	case 0x43:
 		return math.Copysign(0, -1), nil
 	}
-	return 0.0, errors.New(`Encoding of "special value" not from ASN.1 standard`)
+	return 0.0, errors.New(`encoding of "special value" not from ASN.1 standard`)
 }

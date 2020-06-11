@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ErrInvalidTimeFormat is returned when the generalizedTime string was not correct
+// ErrInvalidTimeFormat is returned when the generalizedTime string was not correct.
 var ErrInvalidTimeFormat = errors.New("invalid time format")
 
 var zeroTime = time.Time{}
