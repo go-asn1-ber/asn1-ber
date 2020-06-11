@@ -378,6 +378,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 		case TagObjectDescriptor:
 		case TagExternal:
 		case TagRealFloat:
+			p.Value, err = ParseReal(content)
 		case TagEnumerated:
 			p.Value, _ = ParseInt64(content)
 		case TagEmbeddedPDV:
@@ -406,7 +407,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 		p.Data.Write(content)
 	}
 
-	return p, read, nil
+	return p, read, err
 }
 
 func (p *Packet) Bytes() []byte {
@@ -474,6 +475,22 @@ func NewBoolean(ClassType Class, TagType Type, Tag Tag, Value bool, Description 
 	return p
 }
 
+// NewLDAPBoolean returns a RFC 4511-compliant Boolean packet
+func NewLDAPBoolean(Value bool, Description string) *Packet {
+	intValue := int64(0)
+
+	if Value {
+		intValue = 255
+	}
+
+	p := Encode(ClassUniversal, TypePrimitive, TagBoolean, nil, Description)
+
+	p.Value = Value
+	p.Data.Write(encodeInteger(intValue))
+
+	return p
+}
+
 func NewInteger(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {
 	p := Encode(ClassType, TagType, Tag, nil, Description)
 
@@ -527,6 +544,19 @@ func NewGeneralizedTime(ClassType Class, TagType Type, Tag Tag, Value time.Time,
 	}
 	p.Value = s
 	p.Data.Write([]byte(s))
+  return p
+}
 
+func NewReal(ClassType Class, TagType Type, Tag Tag, Value interface{}, Description string) *Packet {
+	p := Encode(ClassType, TagType, Tag, nil, Description)
+
+	switch v := Value.(type) {
+	case float64:
+		p.Data.Write(encodeFloat(float64(v)))
+	case float32:
+		p.Data.Write(encodeFloat(float64(v)))
+	default:
+		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+	}
 	return p
 }
