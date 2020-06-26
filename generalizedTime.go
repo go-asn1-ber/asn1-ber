@@ -13,6 +13,10 @@ var ErrInvalidTimeFormat = errors.New("invalid time format")
 
 var zeroTime = time.Time{}
 
+// ParseGeneralizedTime parses a string value and if it conforms to
+// GeneralizedTime[^0] format, will return a time.Time for that value.
+//
+// [^0]: https://www.itu.int/rec/T-REC-X.690-201508-I/en Section 11.7
 func ParseGeneralizedTime(v []byte) (time.Time, error) {
 	var format string
 	var fract time.Duration
