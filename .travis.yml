@@ -12,19 +12,28 @@ go:
 
 os:
   - linux
-  - osx
-  - windows
 
 arch:
   - amd64
-  - arm64
 
-dist: bionic
+dist: xenial
 
 env:
-  jobs:
-    - GOARCH=386
-    - GOARCH=amd64
+  - GOARCH=amd64
+
+jobs:
+  include:
+    - os: windows
+      go: 1.14.x
+    - os: osx
+      go: 1.14.x
+    - os: linux
+      go: 1.14.x
+      arch: arm64
+    - os: linux
+      go: 1.14.x
+      env:
+        - GOARCH=386
 
 script:
   - go test -v -cover ./... || go test -v ./...
