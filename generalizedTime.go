@@ -59,10 +59,10 @@ func ParseGeneralizedTime(v []byte) (time.Time, error) {
 		tzIndex = dot
 
 		if dot == 10 {
-			fract = time.Duration(int(f * float64(time.Hour)))
+			fract = time.Duration(int64(f * float64(time.Hour)))
 			format = `2006010215Z`
 		} else {
-			fract = time.Duration(int(f * float64(time.Minute)))
+			fract = time.Duration(int64(f * float64(time.Minute)))
 			format = `200601021504Z`
 		}
 
