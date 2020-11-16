@@ -38,3 +38,6 @@ jobs:
 
 script:
   - go test -v -cover ./... || go test -v ./...
+matrix:
+ excludejobs:
+  go: 1.2.x
