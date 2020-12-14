@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
-	"os"
 	"testing"
 )
 
@@ -194,50 +193,4 @@ func TestSuiteReadPacket(t *testing.T) {
 			t.Errorf("%s: data should be the same\nwant: %#v\ngot: %#v", file, dataOut, dataOut2)
 		}
 	}
-}
-
-func largeBER(t testing.TB, n int) *Packet {
-	packet := Encode(ClassUniversal, TypeConstructed, TagSequence, nil, "LDAP Request")
-	packet.AppendChild(NewInteger(ClassUniversal, TypePrimitive, TagInteger, 20, "MessageID"))
-	for i := 0; i < n; i++ {
-		srp := Encode(ClassApplication, TypeConstructed, 3, nil, "Search Request")
-		srp.AppendChild(NewString(ClassUniversal, TypePrimitive, TagOctetString, "dc=example,dc=com", "Base DN"))
-		srp.AppendChild(NewInteger(ClassUniversal, TypePrimitive, TagEnumerated, uint64(2), "Scope"))
-		srp.AppendChild(NewInteger(ClassUniversal, TypePrimitive, TagEnumerated, uint64(3), "Deref Aliases"))
-		srp.AppendChild(NewInteger(ClassUniversal, TypePrimitive, TagInteger, uint64(0), "Size Limit"))
-		srp.AppendChild(NewInteger(ClassUniversal, TypePrimitive, TagInteger, uint64(0), "Time Limit"))
-		srp.AppendChild(NewBoolean(ClassUniversal, TypePrimitive, TagBoolean, false, "Types Only"))
-		packet.AppendChild(srp)
-	}
-	return packet
-}
-
-func BenchmarkReadPacket(b *testing.B) {
-	benchFile := "tests/bench.ber"
-	p := largeBER(b, 20000)
-	err := ioutil.WriteFile("tests/bench.ber", p.Bytes(), 0777)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(benchFile)
-
-	f, err := os.Open("tests/bench.ber")
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		b.StopTimer()
-		_, err := f.Seek(0, 0)
-		if err != nil {
-			b.Fatal(err)
-		}
-		b.StartTimer()
-		_, err = ReadPacket(f)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-	b.StopTimer()
 }

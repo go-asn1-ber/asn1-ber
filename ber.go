@@ -1,7 +1,6 @@
 package ber
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -285,7 +284,6 @@ func DecodePacketErr(data []byte) (*Packet, error) {
 
 // readPacket reads a single Packet from the reader, returning the number of bytes read.
 func readPacket(reader io.Reader) (*Packet, int, error) {
-	reader = bufio.NewReader(reader)
 	identifier, length, read, err := readHeader(reader)
 	if err != nil {
 		return nil, read, err
