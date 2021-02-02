@@ -19,7 +19,7 @@ func TestReadHeader(t *testing.T) {
 			ExpectedIdentifier: Identifier{},
 			ExpectedLength:     0,
 			ExpectedBytesRead:  0,
-			ExpectedError:      io.ErrUnexpectedEOF.Error(),
+			ExpectedError:      io.EOF.Error(),
 		},
 
 		"valid short form": {
