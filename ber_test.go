@@ -178,3 +178,61 @@ func TestBinaryOctetString(t *testing.T) {
 		t.Error("wrong binary generated")
 	}
 }
+
+// buff is an alias to build a bytes.Reader from an explicit sequence of bytes
+func buff(bs ...byte) *bytes.Reader {
+	return bytes.NewReader(bs)
+}
+
+func TestEOF(t *testing.T) {
+	_, err := ReadPacket(buff())
+	if err != io.EOF {
+		t.Errorf("empty buffer: expected EOF, got %s", err)
+	}
+
+	// testCases for EOF
+	testCases := []struct {
+		name string
+		buf  *bytes.Reader
+	}{
+		{"primitive", buff(0x04, 0x0a, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)},
+		{"constructed", buff(0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02)},
+		{"constructed indefinite length", buff(0x30, 0x80, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02, 0x00, 0x00)},
+	}
+	for _, tc := range testCases {
+		_, err := ReadPacket(tc.buf)
+		if err != nil {
+			t.Errorf("%s: expected no error, got %s", tc.name, err)
+		}
+
+		_, err = ReadPacket(tc.buf)
+		if err != io.EOF {
+			t.Errorf("%s: expected EOF, got %s", tc.name, err)
+		}
+	}
+
+	// testCases for UnexpectedEOF :
+	testCases = []struct {
+		name string
+		buf  *bytes.Reader
+	}{
+		{"truncated tag", buff(0x1f, 0xff)},
+		{"tag and no length", buff(0x04)},
+		{"truncated length", buff(0x04, 0x82, 0x02)},
+		{"header with no content", buff(0x04, 0x0a)},
+		{"header with truncated content", buff(0x04, 0x0a, 0, 1, 2)},
+
+		{"constructed missing content", buff(0x30, 0x06)},
+		{"constructed only first child", buff(0x30, 0x06, 0x02, 0x01, 0x01)},
+		{"constructed truncated", buff(0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01)},
+
+		{"indefinite missing eoc", buff(0x30, 0x80, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02)},
+		{"indefinite truncated eoc", buff(0x30, 0x80, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02, 0x00)},
+	}
+	for _, tc := range testCases {
+		_, err := ReadPacket(tc.buf)
+		if err != io.ErrUnexpectedEOF {
+			t.Errorf("%s: expected UnexpectedEOF, got %s", tc.name, err)
+		}
+	}
+}

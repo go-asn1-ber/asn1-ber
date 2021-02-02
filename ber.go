@@ -317,7 +317,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 			// Read the next packet
 			child, r, err := readPacket(reader)
 			if err != nil {
-				return nil, read, err
+				return nil, read, unexpectedEOF(err)
 			}
 			contentRead += r
 			read += r
@@ -348,10 +348,7 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 	if length > 0 {
 		_, err := io.ReadFull(reader, content)
 		if err != nil {
-			if err == io.EOF {
-				return nil, read, io.ErrUnexpectedEOF
-			}
-			return nil, read, err
+			return nil, read, unexpectedEOF(err)
 		}
 		read += length
 	}
