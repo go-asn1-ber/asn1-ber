@@ -18,7 +18,7 @@ func TestReadIdentifier(t *testing.T) {
 		"empty": {
 			Data:              []byte{},
 			ExpectedBytesRead: 0,
-			ExpectedError:     io.ErrUnexpectedEOF.Error(),
+			ExpectedError:     io.EOF.Error(),
 		},
 
 		"universal primitive eoc": {
