@@ -26,11 +26,11 @@ jobs:
 
     - name: Set up Go
       uses: actions/setup-go@v4
-			with:
-				go-version: ${{ matrix.go }}
+      with:
+        go-version: ${{ matrix.go }}
 
-		- name: Version
-			run: go version
+    - name: Version
+      run: go version
 
     - name: Build
       run: go build -v ./...
