@@ -13,12 +13,12 @@ func TestParseGeneralizedTime(t *testing.T) {
 	}{
 		{
 			"20170222190527Z",
-			time.Date(2017, time.Month(2), 22, 19, 05, 27, 0, time.UTC),
+			time.Date(2017, time.Month(2), 22, 19, 5, 27, 0, time.UTC),
 			nil,
 		},
 		{
 			"201702221905Z",
-			time.Date(2017, time.Month(2), 22, 19, 05, 0, 0, time.UTC),
+			time.Date(2017, time.Month(2), 22, 19, 5, 0, 0, time.UTC),
 			nil,
 		},
 		{
@@ -53,12 +53,12 @@ func TestParseGeneralizedTime(t *testing.T) {
 		},
 		{
 			"20170222190527.123Z",
-			time.Date(2017, time.Month(2), 22, 19, 05, 27, 123*1000*1000, time.UTC),
+			time.Date(2017, time.Month(2), 22, 19, 5, 27, 123*1000*1000, time.UTC),
 			nil,
 		},
 		{
 			"20170222190527,123Z",
-			time.Date(2017, time.Month(2), 22, 19, 05, 27, 123*1000*1000, time.UTC),
+			time.Date(2017, time.Month(2), 22, 19, 5, 27, 123*1000*1000, time.UTC),
 			nil,
 		},
 		{

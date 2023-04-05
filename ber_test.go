@@ -81,7 +81,7 @@ func TestInteger(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	var value = "Hic sunt dracones"
+	value := "Hic sunt dracones"
 
 	packet := NewString(ClassUniversal, TypePrimitive, TagOctetString, value, "String")
 
@@ -150,7 +150,7 @@ func TestReadPacket(t *testing.T) {
 
 func TestBinaryInteger(t *testing.T) {
 	// data src : http://luca.ntop.org/Teaching/Appunti/asn1.html 5.7
-	var data = []struct {
+	data := []struct {
 		v int64
 		e []byte
 	}{
