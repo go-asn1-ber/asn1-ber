@@ -170,10 +170,14 @@ func FuzzDecodePacket(f *testing.F) {
 	MaxPacketLengthBytes = 65536
 	f.Fuzz(func(t *testing.T, data []byte) {
 		stime := time.Now()
-		_, _ = DecodePacketErr(data)
+		p, err := DecodePacketErr(data)
 
 		if e := time.Since(stime); e > (time.Millisecond * 500) {
-			t.Fatalf("DecodePacket took too long: %s", e)
+			t.Fatalf("DecodePacketErr took too long: %s", e)
+		}
+
+		if p == nil && err == nil {
+			t.Fatalf("DecodePacketErr returned a nil packet and no error")
 		}
 	})
 }
