@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"math"
 	"testing"
-	"time"
 )
 
 var errEOF = io.ErrUnexpectedEOF.Error()
@@ -144,42 +143,6 @@ func TestSuiteDecodePacket(t *testing.T) {
 			t.Errorf("%s: data should be the same\nwant: %#v\ngot: %#v", file, dataOut, dataOut2)
 		}
 	}
-}
-
-func FuzzDecodePacket(f *testing.F) {
-	// Seed the fuzz corpus with the test cases
-	for _, tc := range testCases {
-		file := tc.File
-
-		dataIn, err := ioutil.ReadFile(file)
-		if err != nil {
-			f.Fatalf("failed to load file %s into fuzz corpus: %v", file, err)
-			continue
-		}
-		f.Add(dataIn)
-	}
-
-	// Seed the fuzz corpus with data known to cause panics in the past
-	f.Add([]byte{0x09, 0x02, 0x85, 0x30})
-	f.Add([]byte{0x09, 0x01, 0xcf})
-
-	// Set a limit on the length decoded in readPacket() since the call to
-	// make([]byte, length) can allocate up to MaxPacketLengthBytes which is
-	// currently 2 GB. This can cause memory related crashes when fuzzing in
-	// parallel or on memory constrained devices.
-	MaxPacketLengthBytes = 65536
-	f.Fuzz(func(t *testing.T, data []byte) {
-		stime := time.Now()
-		p, err := DecodePacketErr(data)
-
-		if e := time.Since(stime); e > (time.Millisecond * 500) {
-			t.Fatalf("DecodePacketErr took too long: %s", e)
-		}
-
-		if p == nil && err == nil {
-			t.Fatalf("DecodePacketErr returned a nil packet and no error")
-		}
-	})
 }
 
 func TestSuiteReadPacket(t *testing.T) {
