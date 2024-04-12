@@ -30,11 +30,6 @@ func FuzzDecodePacket(f *testing.F) {
 	f.Add([]byte{0x09, 0x02, 0x85, 0x30})
 	f.Add([]byte{0x09, 0x01, 0xcf})
 
-	// Set a limit on the length decoded in readPacket() since the call to
-	// make([]byte, length) can allocate up to MaxPacketLengthBytes which is
-	// currently 2 GB. This can cause memory related crashes when fuzzing in
-	// parallel or on memory constrained devices.
-	MaxPacketLengthBytes = 65536
 	f.Fuzz(func(t *testing.T, data []byte) {
 		stime := time.Now()
 		p, err := DecodePacketErr(data)
