@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -352,13 +353,22 @@ func readPacket(reader io.Reader) (*Packet, int, error) {
 	if MaxPacketLengthBytes > 0 && int64(length) > MaxPacketLengthBytes {
 		return nil, read, fmt.Errorf("length %d greater than maximum %d", length, MaxPacketLengthBytes)
 	}
-	content := make([]byte, length)
+
+	var content []byte
 	if length > 0 {
-		_, err := io.ReadFull(reader, content)
+		// Read the content and limit it to the parsed length.
+		// If the content is less than the length, we return an EOF error.
+		content, err = ioutil.ReadAll(io.LimitReader(reader, int64(length)))
+		if err == nil && len(content) < int(length) {
+			err = io.EOF
+		}
 		if err != nil {
 			return nil, read, unexpectedEOF(err)
 		}
-		read += length
+		read += len(content)
+	} else {
+		// If length == 0, we set the ByteValue to an empty slice
+		content = make([]byte, 0)
 	}
 
 	if p.ClassType == ClassUniversal {
