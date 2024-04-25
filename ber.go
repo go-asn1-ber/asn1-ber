@@ -654,7 +654,6 @@ func NewOID(classType Class, tagType Type, tag Tag, value interface{}, descripti
 			fmt.Printf("faled writing %v", err)
 			return nil
 		}
-		fmt.Println("Writing OID ", v, encoded)
 		p.Value = v
 		p.Data.Write(encoded)
 		// TODO: support []int already ?
