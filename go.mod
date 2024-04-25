@@ -1,3 +1,3 @@
-module github.com/go-asn1-ber/asn1-ber
+module gopkg.in/asn1-ber.v1
 
-go 1.13
+go 1.21
