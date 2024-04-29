@@ -651,7 +651,7 @@ func NewOID(classType Class, tagType Type, tag Tag, value interface{}, descripti
 	case string:
 		encoded, err := encodeOID(v)
 		if err != nil {
-			fmt.Printf("faled writing %v", err)
+			fmt.Printf("failed writing %v", err)
 			return nil
 		}
 		p.Value = v
