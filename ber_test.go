@@ -100,6 +100,24 @@ func TestString(t *testing.T) {
 	}
 }
 
+func TestEncodeDecodeOID(t *testing.T) {
+	for _, v := range []string{"0.1", "1.1", "2.3", "0.4", "0.4.5.1888", "0.10.5.1888.234.324234"} {
+		enc, err := encodeOID(v)
+		if err != nil {
+			t.Errorf("error on encoding object identifier when encoding %s: %v", v, err)
+		}
+		parsed, err := parseObjectIdentifier(enc)
+		if err != nil {
+			t.Errorf("error on parsing object identifier when parsing %s: %v", v, err)
+		}
+		t.Log(enc)
+		t.Log(OIDToString(parsed))
+		if v != OIDToString(parsed) {
+			t.Error("encoded object identifier did not match parsed")
+		}
+	}
+}
+
 func TestSequenceAndAppendChild(t *testing.T) {
 	values := []string{
 		"HIC SVNT LEONES",
