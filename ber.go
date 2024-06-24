@@ -708,13 +708,12 @@ func encodeOID(oidString string) ([]byte, error) {
 }
 
 func encodeRelativeOID(oidString string) ([]byte, error) {
-	// Convert the string representation to an asn1.ObjectIdentifier
 	parts := strings.Split(oidString, ".")
 	oid := make([]int, len(parts))
 	for i, part := range parts {
 		var val int
 		if _, err := fmt.Sscanf(part, "%d", &val); err != nil {
-			return nil, fmt.Errorf("invalid OID part '%s': %w", part, err)
+			return nil, fmt.Errorf("invalid RELATIVE OID part '%s': %w", part, err)
 		}
 		oid[i] = val
 	}
@@ -812,23 +811,13 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 	return
 }
 
-// parseObjectIdentifier parses an OBJECT IDENTIFIER from the given bytes and
-// returns it. An object identifier is a sequence of variable length integers
-// that are assigned in a hierarchy.
 func parseRelativeObjectIdentifier(bytes []byte) (s []int, err error) {
 	if len(bytes) == 0 {
-		err = fmt.Errorf("zero length OBJECT IDENTIFIER")
+		err = fmt.Errorf("zero length RELATIVE OBJECT IDENTIFIER")
 		return
 	}
 
-	// In the worst case, we get two elements from the first byte (which is
-	// encoded differently) and then every varint is a single byte long.
 	s = make([]int, len(bytes)+1)
-
-	// The first varint is 40*value1 + value2:
-	// According to this packing, value1 can take the values 0, 1 and 2 only.
-	// When value1 = 0 or value1 = 1, then value2 is <= 39. When value1 = 2,
-	// then there are no restrictions on value2.
 
 	var v, offset int
 	i := 0
