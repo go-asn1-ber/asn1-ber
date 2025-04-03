@@ -560,16 +560,14 @@ func NewBoolean(classType Class, tagType Type, tag Tag, value bool, description 
 
 // NewLDAPBoolean returns a RFC 4511-compliant Boolean packet.
 func NewLDAPBoolean(classType Class, tagType Type, tag Tag, value bool, description string) *Packet {
-	intValue := int64(0)
-
-	if value {
-		intValue = 255
-	}
-
 	p := Encode(classType, tagType, tag, nil, description)
 
 	p.Value = value
-	p.Data.Write(encodeInteger(intValue))
+	if value {
+		p.Data.Write([]byte{255})
+	} else {
+		p.Data.Write([]byte{0})
+	}
 
 	return p
 }
