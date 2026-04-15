@@ -303,3 +303,37 @@ func TestMaxNestingDepthUnlimited(t *testing.T) {
 		t.Errorf("50 levels with MaxNestingDepth=0: unexpected error %v", err)
 	}
 }
+
+func TestMaxNestingDepthReadPacket(t *testing.T) {
+	old := MaxNestingDepth
+	defer func() { MaxNestingDepth = old }()
+
+	MaxNestingDepth = 5
+
+	// depth=5: should succeed
+	data5 := buildNestedSequence(5)
+	_, err := ReadPacket(bytes.NewReader(data5))
+	if err != nil {
+		t.Errorf("5 levels with MaxNestingDepth=5: expected success, got %v", err)
+	}
+
+	// depth=6: should fail
+	data6 := buildNestedSequence(6)
+	_, err = ReadPacket(bytes.NewReader(data6))
+	if err == nil {
+		t.Error("6 levels with MaxNestingDepth=5: expected error, got nil")
+	}
+}
+
+func TestMaxNestingDepthReadPacketUnlimited(t *testing.T) {
+	old := MaxNestingDepth
+	defer func() { MaxNestingDepth = old }()
+
+	MaxNestingDepth = 0
+
+	data := buildNestedSequence(50)
+	_, err := ReadPacket(bytes.NewReader(data))
+	if err != nil {
+		t.Errorf("50 levels with MaxNestingDepth=0: unexpected error %v", err)
+	}
+}
