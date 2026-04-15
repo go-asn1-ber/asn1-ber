@@ -254,3 +254,52 @@ func TestEOF(t *testing.T) {
 		}
 	}
 }
+
+// buildNestedSequence builds a BER-encoded SEQUENCE nested depth levels deep.
+// Each level wraps the previous; the innermost is an empty SEQUENCE.
+// Only valid for small depth where each length fits in one byte (<= 127 content bytes).
+func buildNestedSequence(depth int) []byte {
+	inner := []byte{0x30, 0x00} // empty SEQUENCE
+	for i := 1; i < depth; i++ {
+		wrapped := make([]byte, 0, 2+len(inner))
+		wrapped = append(wrapped, 0x30, byte(len(inner)))
+		wrapped = append(wrapped, inner...)
+		inner = wrapped
+	}
+	return inner
+}
+
+func TestMaxNestingDepth(t *testing.T) {
+	old := MaxNestingDepth
+	defer func() { MaxNestingDepth = old }()
+
+	MaxNestingDepth = 5
+
+	// depth=5: outermost at depth 0, innermost at depth 4 — should succeed
+	data5 := buildNestedSequence(5)
+	_, err := DecodePacketErr(data5)
+	if err != nil {
+		t.Errorf("5 levels with MaxNestingDepth=5: expected success, got %v", err)
+	}
+
+	// depth=6: requires depth 5 which equals MaxNestingDepth — should fail
+	data6 := buildNestedSequence(6)
+	_, err = DecodePacketErr(data6)
+	if err == nil {
+		t.Error("6 levels with MaxNestingDepth=5: expected error, got nil")
+	}
+}
+
+func TestMaxNestingDepthUnlimited(t *testing.T) {
+	old := MaxNestingDepth
+	defer func() { MaxNestingDepth = old }()
+
+	MaxNestingDepth = 0
+
+	// 50-deep nesting with single-byte lengths — should succeed with no limit
+	data := buildNestedSequence(50)
+	_, err := DecodePacketErr(data)
+	if err != nil {
+		t.Errorf("50 levels with MaxNestingDepth=0: unexpected error %v", err)
+	}
+}
