@@ -24,8 +24,12 @@ var MaxNestingDepth int = 1000
 
 type Packet struct {
 	Identifier
-	Value       interface{}
-	ByteValue   []byte
+	Value     interface{}
+	ByteValue []byte
+	// Data holds the raw content octets of a primitive packet. For a
+	// constructed packet it is NOT populated after decoding or AppendChild --
+	// the content is derived lazily from Children by Bytes(). Do not read Data
+	// on a constructed packet; walk Children or call Bytes() instead.
 	Data        *bytes.Buffer
 	Children    []*Packet
 	Description string
@@ -197,12 +201,26 @@ func DescribePacket(p *Packet) string {
 		description = p.Description + ": "
 	}
 
-	dataLen := 0
-	if p.Data != nil {
-		dataLen = p.Data.Len()
+	return fmt.Sprintf("%s(%s, %s, %s) Len=%d %q", description, classStr, tagTypeStr, tagStr, p.contentLength(), value)
+}
+
+// contentLength reports the length in bytes of the packet's BER content -- the
+// value that follows the length octets -- computed without materializing the
+// encoded form. For a constructed packet this recurses through its children.
+func (p *Packet) contentLength() int {
+	if len(p.Children) == 0 {
+		if p.Data == nil {
+			return 0
+		}
+		return p.Data.Len()
 	}
 
-	return fmt.Sprintf("%s(%s, %s, %s) Len=%d %q", description, classStr, tagTypeStr, tagStr, dataLen, value)
+	n := 0
+	for _, child := range p.Children {
+		c := child.contentLength()
+		n += len(encodeIdentifier(child.Identifier)) + len(encodeLength(c)) + c
+	}
+	return n
 }
 
 func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
@@ -486,18 +504,39 @@ func isPrintableString(val string) error {
 	return nil
 }
 
+// Bytes returns the BER encoding of the packet and, for a constructed packet,
+// its children. It is recomputed on each call (not cached), so avoid calling it
+// repeatedly on large packets in hot paths.
 func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 
 	out.Write(encodeIdentifier(p.Identifier))
-	out.Write(encodeLength(p.Data.Len()))
-	out.Write(p.Data.Bytes())
+
+	if len(p.Children) == 0 {
+		// Primitive packet (or an empty constructed one): the content is p.Data.
+		out.Write(encodeLength(p.Data.Len()))
+		out.Write(p.Data.Bytes())
+		return out.Bytes()
+	}
+
+	// Constructed packet: serialize children on demand. We deliberately do not
+	// cache this in p.Data (see AppendChild): doing so at every level made a
+	// decoded tree cost O(depth x subtree) memory.
+	var content bytes.Buffer
+	for _, child := range p.Children {
+		content.Write(child.Bytes())
+	}
+	out.Write(encodeLength(content.Len()))
+	out.Write(content.Bytes())
 
 	return out.Bytes()
 }
 
 func (p *Packet) AppendChild(child *Packet) {
-	p.Data.Write(child.Bytes())
+	// Children are serialized lazily by Bytes(); we intentionally do not copy
+	// the child's encoded form into p.Data. Eager buffering made every ancestor
+	// retain a full copy of its subtree -- an O(depth x subtree) memory
+	// amplification that a deeply-nested packet could exploit.
 	p.Children = append(p.Children, child)
 }
 
