@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -181,7 +180,6 @@ func PrintPacket(p *Packet) {
 // If the packet is a sequence, use `printPacket()`, or browse
 // sequence yourself.
 func DescribePacket(p *Packet) string {
-
 	classStr := ClassMap[p.ClassType]
 
 	tagTypeStr := TypeMap[p.TagType]
@@ -199,7 +197,12 @@ func DescribePacket(p *Packet) string {
 		description = p.Description + ": "
 	}
 
-	return fmt.Sprintf("%s(%s, %s, %s) Len=%d %q", description, classStr, tagTypeStr, tagStr, p.Data.Len(), value)
+	dataLen := 0
+	if p.Data != nil {
+		dataLen = p.Data.Len()
+	}
+
+	return fmt.Sprintf("%s(%s, %s, %s) Len=%d %q", description, classStr, tagTypeStr, tagStr, dataLen, value)
 }
 
 func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
@@ -236,7 +239,7 @@ func DecodeString(data []byte) string {
 func ParseInt64(bytes []byte) (ret int64, err error) {
 	if len(bytes) > 8 {
 		// We'll overflow an int64 in this case.
-		err = fmt.Errorf("integer too large")
+		err = errors.New("integer too large")
 		return
 	}
 	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
@@ -282,7 +285,10 @@ func int64Length(i int64) (numBytes int) {
 // DecodePacket decodes the given bytes into a single Packet
 // If a decode error is encountered, nil is returned.
 func DecodePacket(data []byte) *Packet {
-	p, _, _ := readPacket(bytes.NewBuffer(data), 0)
+	p, _, err := readPacket(bytes.NewBuffer(data), 0)
+	if err != nil {
+		return nil
+	}
 
 	return p
 }
@@ -368,7 +374,7 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 	if length > 0 {
 		// Read the content and limit it to the parsed length.
 		// If the content is less than the length, we return an EOF error.
-		content, err = ioutil.ReadAll(io.LimitReader(reader, int64(length)))
+		content, err = io.ReadAll(io.LimitReader(reader, int64(length)))
 		if err == nil && len(content) < int(length) {
 			err = io.EOF
 		}
@@ -388,11 +394,12 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		switch p.Tag {
 		case TagEOC:
 		case TagBoolean:
-			val, _ := ParseInt64(content)
+			var val int64
+			val, err = ParseInt64(content)
 
 			p.Value = val != 0
 		case TagInteger:
-			p.Value, _ = ParseInt64(content)
+			p.Value, err = ParseInt64(content)
 		case TagBitString:
 		case TagOctetString:
 			// the actual string encoding is not known here
@@ -401,8 +408,8 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 			p.Value = DecodeString(content)
 		case TagNULL:
 		case TagObjectIdentifier:
-			oid, err := parseObjectIdentifier(content)
-			if err == nil {
+			var oid []int
+			if oid, err = parseObjectIdentifier(content); err == nil {
 				p.Value = OIDToString(oid)
 			}
 		case TagObjectDescriptor:
@@ -410,7 +417,7 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		case TagRealFloat:
 			p.Value, err = ParseReal(content)
 		case TagEnumerated:
-			p.Value, _ = ParseInt64(content)
+			p.Value, err = ParseInt64(content)
 		case TagEmbeddedPDV:
 		case TagUTF8String:
 			val := DecodeString(content)
@@ -420,8 +427,8 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 				p.Value = val
 			}
 		case TagRelativeOID:
-			oid, err := parseRelativeObjectIdentifier(content)
-			if err == nil {
+			var oid []int
+			if oid, err = parseRelativeObjectIdentifier(content); err == nil {
 				p.Value = OIDToString(oid)
 			}
 		case TagSequence:
@@ -437,7 +444,7 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		case TagIA5String:
 			val := DecodeString(content)
 			for i, c := range val {
-				if c >= 0x7F {
+				if c > 0x7F {
 					err = fmt.Errorf("invalid character for IA5String at pos %d: %c", i, c)
 					break
 				}
@@ -510,7 +517,8 @@ func Encode(classType Class, tagType Type, tag Tag, value interface{}, descripti
 	if value != nil {
 		v := reflect.ValueOf(value)
 
-		if classType == ClassUniversal {
+		switch classType {
+		case ClassUniversal:
 			switch tag {
 			case TagOctetString:
 				sv, ok := v.Interface().(string)
@@ -529,7 +537,7 @@ func Encode(classType Class, tagType Type, tag Tag, value interface{}, descripti
 					p.Data.Write(bv)
 				}
 			}
-		} else if classType == ClassContext {
+		case ClassContext:
 			switch tag {
 			case TagEnumerated:
 				bv, ok := v.Interface().([]byte)
@@ -657,7 +665,6 @@ func NewOID(classType Class, tagType Type, tag Tag, value interface{}, descripti
 	case string:
 		encoded, err := encodeOID(v)
 		if err != nil {
-			fmt.Printf("failed writing %v", err)
 			return nil
 		}
 		p.Value = v
@@ -676,7 +683,6 @@ func NewRelativeOID(classType Class, tagType Type, tag Tag, value interface{}, d
 	case string:
 		encoded, err := encodeRelativeOID(v)
 		if err != nil {
-			fmt.Printf("failed writing %v", err)
 			return nil
 		}
 		p.Value = v
@@ -694,8 +700,8 @@ func encodeOID(oidString string) ([]byte, error) {
 	parts := strings.Split(oidString, ".")
 	oid := make([]int, len(parts))
 	for i, part := range parts {
-		var val int
-		if _, err := fmt.Sscanf(part, "%d", &val); err != nil {
+		val, err := strconv.Atoi(part)
+		if err != nil {
 			return nil, fmt.Errorf("invalid OID part '%s': %w", part, err)
 		}
 		oid[i] = val
@@ -717,8 +723,8 @@ func encodeRelativeOID(oidString string) ([]byte, error) {
 	parts := strings.Split(oidString, ".")
 	oid := make([]int, len(parts))
 	for i, part := range parts {
-		var val int
-		if _, err := fmt.Sscanf(part, "%d", &val); err != nil {
+		val, err := strconv.Atoi(part)
+		if err != nil {
 			return nil, fmt.Errorf("invalid RELATIVE OID part '%s': %w", part, err)
 		}
 		oid[i] = val
@@ -748,6 +754,7 @@ func appendBase128Int(dst []byte, n int64) []byte {
 
 	return dst
 }
+
 func base128IntLength(n int64) int {
 	if n == 0 {
 		return 1
@@ -781,7 +788,7 @@ func OIDToString(oi []int) string {
 // that are assigned in a hierarchy.
 func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 	if len(bytes) == 0 {
-		err = fmt.Errorf("zero length OBJECT IDENTIFIER")
+		err = errors.New("zero length OBJECT IDENTIFIER")
 		return
 	}
 
@@ -819,7 +826,7 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 
 func parseRelativeObjectIdentifier(bytes []byte) (s []int, err error) {
 	if len(bytes) == 0 {
-		err = fmt.Errorf("zero length RELATIVE OBJECT IDENTIFIER")
+		err = errors.New("zero length RELATIVE OBJECT IDENTIFIER")
 		return
 	}
 
@@ -847,7 +854,7 @@ func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) 
 		// 5 * 7 bits per byte == 35 bits of data
 		// Thus the representation is either non-minimal or too large for an int32
 		if shifted == 5 {
-			err = fmt.Errorf("base 128 integer too large")
+			err = errors.New("base 128 integer too large")
 			return
 		}
 		ret64 <<= 7
@@ -855,7 +862,7 @@ func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) 
 		// integers should be minimally encoded, so the leading octet should
 		// never be 0x80
 		if shifted == 0 && b == 0x80 {
-			err = fmt.Errorf("integer is not minimally encoded")
+			err = errors.New("integer is not minimally encoded")
 			return
 		}
 		ret64 |= int64(b & 0x7f)
@@ -864,11 +871,11 @@ func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) 
 			ret = int(ret64)
 			// Ensure that the returned value fits in an int on all platforms
 			if ret64 > math.MaxInt32 {
-				err = fmt.Errorf("base 128 integer too large")
+				err = errors.New("base 128 integer too large")
 			}
 			return
 		}
 	}
-	err = fmt.Errorf("truncated base 128 integer")
+	err = errors.New("truncated base 128 integer")
 	return
 }
