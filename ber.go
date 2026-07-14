@@ -484,7 +484,14 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		p.Data.Write(content)
 	}
 
-	return p, read, err
+	// A content-parse failure (invalid REAL, UTF-8, OID, over-long INTEGER,
+	// etc.) yields no usable packet; return nil so callers never see a
+	// partially-populated packet alongside an error.
+	if err != nil {
+		return nil, read, err
+	}
+
+	return p, read, nil
 }
 
 func isPrintableString(val string) error {
@@ -627,7 +634,9 @@ func NewLDAPBoolean(classType Class, tagType Type, tag Tag, value bool, descript
 	return p
 }
 
-func NewInteger(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+// NewIntegerErr behaves like [NewInteger] but returns an error instead of
+// panicking when value is not a supported signed or unsigned integer type.
+func NewIntegerErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
 	p := Encode(classType, tagType, tag, nil, description)
 
 	p.Value = value
@@ -655,9 +664,19 @@ func NewInteger(classType Class, tagType Type, tag Tag, value interface{}, descr
 		p.Data.Write(encodeInteger(int64(v)))
 	default:
 		// TODO : add support for big.Int ?
-		panic(fmt.Sprintf("Invalid type %T, expected {u|}int{64|32|16|8}", v))
+		return nil, fmt.Errorf("invalid type %T, expected {u|}int{64|32|16|8}", v)
 	}
 
+	return p, nil
+}
+
+// NewInteger builds an INTEGER packet. It panics if value is not a signed or
+// unsigned integer type; use [NewIntegerErr] to receive an error instead.
+func NewInteger(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+	p, err := NewIntegerErr(classType, tagType, tag, value, description)
+	if err != nil {
+		panic(err.Error())
+	}
 	return p
 }
 
@@ -683,7 +702,9 @@ func NewGeneralizedTime(classType Class, tagType Type, tag Tag, value time.Time,
 	return p
 }
 
-func NewReal(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+// NewRealErr behaves like [NewReal] but returns an error instead of panicking
+// when value is not a float32 or float64.
+func NewRealErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
 	p := Encode(classType, tagType, tag, nil, description)
 
 	switch v := value.(type) {
@@ -692,43 +713,79 @@ func NewReal(classType Class, tagType Type, tag Tag, value interface{}, descript
 	case float32:
 		p.Data.Write(encodeFloat(float64(v)))
 	default:
-		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+		return nil, fmt.Errorf("invalid type %T, expected float{64|32}", v)
+	}
+	return p, nil
+}
+
+// NewReal builds a REAL packet. It panics if value is not a float32 or float64;
+// use [NewRealErr] to receive an error instead.
+func NewReal(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+	p, err := NewRealErr(classType, tagType, tag, value, description)
+	if err != nil {
+		panic(err.Error())
 	}
 	return p
 }
 
+// NewOIDErr behaves like [NewOID] but returns an error instead of panicking on
+// a non-string value or returning nil on an invalid OID string.
+func NewOIDErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
+	p := Encode(classType, tagType, tag, nil, description)
+
+	v, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid type %T, expected string", value)
+	}
+	encoded, err := encodeOID(v)
+	if err != nil {
+		return nil, err
+	}
+	p.Value = v
+	p.Data.Write(encoded)
+	return p, nil
+}
+
+// Deprecated: NewOID panics on a non-string value and returns nil on an invalid
+// OID string. Use [NewOIDErr], which reports both as errors.
 func NewOID(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
-	p := Encode(classType, tagType, tag, nil, description)
-
-	switch v := value.(type) {
-	case string:
-		encoded, err := encodeOID(v)
-		if err != nil {
-			return nil
+	p, err := NewOIDErr(classType, tagType, tag, value, description)
+	if err != nil {
+		if _, ok := value.(string); !ok {
+			panic(err.Error())
 		}
-		p.Value = v
-		p.Data.Write(encoded)
-		// TODO: support []int already ?
-	default:
-		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+		return nil
 	}
 	return p
 }
 
-func NewRelativeOID(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+// NewRelativeOIDErr behaves like [NewRelativeOID] but returns an error instead
+// of panicking on a non-string value or returning nil on invalid input.
+func NewRelativeOIDErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
 	p := Encode(classType, tagType, tag, nil, description)
 
-	switch v := value.(type) {
-	case string:
-		encoded, err := encodeRelativeOID(v)
-		if err != nil {
-			return nil
+	v, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid type %T, expected string", value)
+	}
+	encoded, err := encodeRelativeOID(v)
+	if err != nil {
+		return nil, err
+	}
+	p.Value = v
+	p.Data.Write(encoded)
+	return p, nil
+}
+
+// Deprecated: NewRelativeOID panics on a non-string value and returns nil on
+// invalid input. Use [NewRelativeOIDErr], which reports both as errors.
+func NewRelativeOID(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+	p, err := NewRelativeOIDErr(classType, tagType, tag, value, description)
+	if err != nil {
+		if _, ok := value.(string); !ok {
+			panic(err.Error())
 		}
-		p.Value = v
-		p.Data.Write(encoded)
-		// TODO: support []int already ?
-	default:
-		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+		return nil
 	}
 	return p
 }
@@ -746,7 +803,7 @@ func encodeOID(oidString string) ([]byte, error) {
 		oid[i] = val
 	}
 	if len(oid) < 2 || oid[0] > 2 || (oid[0] < 2 && oid[1] >= 40) {
-		panic(fmt.Sprintf("invalid object identifier % d", oid)) // TODO: not elegant
+		return nil, fmt.Errorf("invalid object identifier %v", oid)
 	}
 	encoded := make([]byte, 0)
 
