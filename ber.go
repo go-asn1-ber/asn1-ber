@@ -790,24 +790,33 @@ func NewRelativeOID(classType Class, tagType Type, tag Tag, value interface{}, d
 	return p
 }
 
-// encodeOID takes a string representation of an OID and returns its DER-encoded byte slice along with any error.
-func encodeOID(oidString string) ([]byte, error) {
-	// Convert the string representation to an asn1.ObjectIdentifier
+// parseDottedInts splits a dotted-decimal OID string (e.g. "1.2.840") into its
+// integer arcs. label names the OID kind for error messages.
+func parseDottedInts(oidString, label string) ([]int, error) {
 	parts := strings.Split(oidString, ".")
 	oid := make([]int, len(parts))
 	for i, part := range parts {
 		val, err := strconv.Atoi(part)
 		if err != nil {
-			return nil, fmt.Errorf("invalid OID part '%s': %w", part, err)
+			return nil, fmt.Errorf("invalid %s part '%s': %w", label, part, err)
 		}
 		oid[i] = val
+	}
+	return oid, nil
+}
+
+// encodeOID takes a string representation of an OID and returns its DER-encoded byte slice along with any error.
+func encodeOID(oidString string) ([]byte, error) {
+	oid, err := parseDottedInts(oidString, "OID")
+	if err != nil {
+		return nil, err
 	}
 	if len(oid) < 2 || oid[0] > 2 || (oid[0] < 2 && oid[1] >= 40) {
 		return nil, fmt.Errorf("invalid object identifier %v", oid)
 	}
-	encoded := make([]byte, 0)
 
-	encoded = appendBase128Int(encoded[:0], int64(oid[0]*40+oid[1]))
+	// The first two arcs are combined into a single value: 40*arc0 + arc1.
+	encoded := appendBase128Int(nil, int64(oid[0]*40+oid[1]))
 	for i := 2; i < len(oid); i++ {
 		encoded = appendBase128Int(encoded, int64(oid[i]))
 	}
@@ -816,20 +825,14 @@ func encodeOID(oidString string) ([]byte, error) {
 }
 
 func encodeRelativeOID(oidString string) ([]byte, error) {
-	parts := strings.Split(oidString, ".")
-	oid := make([]int, len(parts))
-	for i, part := range parts {
-		val, err := strconv.Atoi(part)
-		if err != nil {
-			return nil, fmt.Errorf("invalid RELATIVE OID part '%s': %w", part, err)
-		}
-		oid[i] = val
+	oid, err := parseDottedInts(oidString, "RELATIVE OID")
+	if err != nil {
+		return nil, err
 	}
 
-	encoded := make([]byte, 0)
-
-	for i := 0; i < len(oid); i++ {
-		encoded = appendBase128Int(encoded, int64(oid[i]))
+	var encoded []byte
+	for _, arc := range oid {
+		encoded = appendBase128Int(encoded, int64(arc))
 	}
 
 	return encoded, nil
@@ -879,18 +882,33 @@ func OIDToString(oi []int) string {
 	return s.String()
 }
 
+// parseBase128Ints decodes successive base-128 integers from bytes[offset:]
+// into dst starting at index i, returning the index one past the last element
+// written (the total count when i started at 0).
+func parseBase128Ints(bytes []byte, offset int, dst []int, i int) (int, error) {
+	for offset < len(bytes) {
+		v, next, err := parseBase128Int(bytes, offset)
+		if err != nil {
+			return i, err
+		}
+		dst[i] = v
+		offset = next
+		i++
+	}
+	return i, nil
+}
+
 // parseObjectIdentifier parses an OBJECT IDENTIFIER from the given bytes and
 // returns it. An object identifier is a sequence of variable length integers
 // that are assigned in a hierarchy.
-func parseObjectIdentifier(bytes []byte) (s []int, err error) {
+func parseObjectIdentifier(bytes []byte) ([]int, error) {
 	if len(bytes) == 0 {
-		err = errors.New("zero length OBJECT IDENTIFIER")
-		return
+		return nil, errors.New("zero length OBJECT IDENTIFIER")
 	}
 
 	// In the worst case, we get two elements from the first byte (which is
 	// encoded differently) and then every varint is a single byte long.
-	s = make([]int, len(bytes)+1)
+	s := make([]int, len(bytes)+1)
 
 	// The first varint is 40*value1 + value2:
 	// According to this packing, value1 can take the values 0, 1 and 2 only.
@@ -898,7 +916,7 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 	// then there are no restrictions on value2.
 	v, offset, err := parseBase128Int(bytes, 0)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if v < 80 {
 		s[0] = v / 40
@@ -908,37 +926,25 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 		s[1] = v - 80
 	}
 
-	i := 2
-	for ; offset < len(bytes); i++ {
-		v, offset, err = parseBase128Int(bytes, offset)
-		if err != nil {
-			return
-		}
-		s[i] = v
+	i, err := parseBase128Ints(bytes, offset, s, 2)
+	if err != nil {
+		return nil, err
 	}
-	s = s[0:i]
-	return
+	return s[:i], nil
 }
 
-func parseRelativeObjectIdentifier(bytes []byte) (s []int, err error) {
+func parseRelativeObjectIdentifier(bytes []byte) ([]int, error) {
 	if len(bytes) == 0 {
-		err = errors.New("zero length RELATIVE OBJECT IDENTIFIER")
-		return
+		return nil, errors.New("zero length RELATIVE OBJECT IDENTIFIER")
 	}
 
-	s = make([]int, len(bytes)+1)
+	s := make([]int, len(bytes)+1)
 
-	var v, offset int
-	i := 0
-	for ; offset < len(bytes); i++ {
-		v, offset, err = parseBase128Int(bytes, offset)
-		if err != nil {
-			return
-		}
-		s[i] = v
+	i, err := parseBase128Ints(bytes, 0, s, 0)
+	if err != nil {
+		return nil, err
 	}
-	s = s[0:i]
-	return
+	return s[:i], nil
 }
 
 // parseBase128Int parses a base-128 encoded int from the given offset in the
