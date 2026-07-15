@@ -337,3 +337,57 @@ func TestMaxNestingDepthReadPacketUnlimited(t *testing.T) {
 		t.Errorf("50 levels with MaxNestingDepth=0: unexpected error %v", err)
 	}
 }
+
+// buildConstructedIndefinite builds an indefinite-length SEQUENCE containing children
+// NULL (0x05 0x00) primitives, terminated by an EOC marker.
+func buildConstructedIndefinite(children int) []byte {
+	var buf bytes.Buffer
+	buf.Write([]byte{0x30, 0x80}) // SEQUENCE, indefinite length
+	for i := 0; i < children; i++ {
+		buf.Write([]byte{0x05, 0x00}) // NULL, length 0
+	}
+	buf.Write([]byte{0x00, 0x00}) // EOC
+	return buf.Bytes()
+}
+
+func TestMaxPacketLengthBytes(t *testing.T) {
+	old := MaxPacketLengthBytes
+	defer func() { MaxPacketLengthBytes = old }()
+
+	decoders := map[string]func([]byte) (*Packet, error){
+		"DecodePacketErr": DecodePacketErr,
+		"ReadPacket":      func(b []byte) (*Packet, error) { return ReadPacket(bytes.NewReader(b)) },
+	}
+
+	tests := []struct {
+		name         string
+		limit        int64
+		data         []byte
+		wantChildren int // ignored when wantErr
+		wantErr      bool
+	}{
+		// Indefinite length carries no declared bound; only the aggregate byte count catches it.
+		{"indefinite over limit", 1024, buildConstructedIndefinite(2000), 0, true},
+		// SEQUENCE declaring definite long-form length 0x2000 (8192) — rejected up front.
+		{"definite over limit", 1024, []byte{0x30, 0x82, 0x20, 0x00}, 0, true},
+		{"within limit", 1024, buildConstructedIndefinite(10), 10, false},
+		{"unlimited", 0, buildConstructedIndefinite(5000), 5000, false},
+	}
+
+	for _, tt := range tests {
+		for decName, decode := range decoders {
+			t.Run(tt.name+"/"+decName, func(t *testing.T) {
+				MaxPacketLengthBytes = tt.limit
+				p, err := decode(tt.data)
+				switch {
+				case tt.wantErr && err == nil:
+					t.Fatal("expected error, got nil")
+				case !tt.wantErr && err != nil:
+					t.Fatalf("unexpected error: %v", err)
+				case !tt.wantErr && len(p.Children) != tt.wantChildren:
+					t.Errorf("expected %d children, got %d", tt.wantChildren, len(p.Children))
+				}
+			})
+		}
+	}
+}
