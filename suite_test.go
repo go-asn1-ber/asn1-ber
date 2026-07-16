@@ -81,7 +81,7 @@ var testCases = []struct {
 	{File: "tests/tc47.ber", Error: "eoc child not allowed with definite length"},
 	{File: "tests/tc48.ber", Error: "", IndefiniteEncoding: true}, // Error: "Using of more than 7 "unused bits" in BIT STRING with constrictive encoding form"
 	{File: "tests/tc49.ber", Error: ""},
-	{File: "tests/tc50.ber", Error: is64bit("length cannot be less than -1", "long-form length overflow")},
+	{File: "tests/tc50.ber", Error: "long-form length overflow"},
 	{File: "tests/tc51.ber", Error: is64bit(fmt.Sprintf("length 206966894640 greater than maximum %v", MaxPacketLengthBytes), "long-form length overflow")},
 }
 

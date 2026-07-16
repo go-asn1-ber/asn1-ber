@@ -80,6 +80,36 @@ func TestReadLength(t *testing.T) {
 			ExpectedLength:    math.MaxInt32,
 			ExpectedBytesRead: 5,
 		},
+		"long-definite-form all-ones (indefinite sentinel collision)": {
+			Data: []byte{
+				LengthLongFormBitmask | 8,
+				0xFF,
+				0xFF,
+				0xFF,
+				0xFF,
+				0xFF,
+				0xFF,
+				0xFF,
+				0xFF,
+			},
+			ExpectedBytesRead: 9,
+			ExpectedError:     "long-form length overflow",
+		},
+		"long-definite-form negative int64": {
+			Data: []byte{
+				LengthLongFormBitmask | 8,
+				0x80,
+				0x00,
+				0x00,
+				0x00,
+				0x00,
+				0x00,
+				0x00,
+				0x00,
+			},
+			ExpectedBytesRead: 9,
+			ExpectedError:     "long-form length overflow",
+		},
 		"long-definite-form max length (64-bit)": {
 			Data: []byte{
 				LengthLongFormBitmask | 8,
