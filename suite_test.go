@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
+	"os"
 	"testing"
 )
 
@@ -45,10 +45,10 @@ var testCases = []struct {
 	// Integers
 	{File: "tests/tc18.ber", Error: ""},
 	{File: "tests/tc19.ber", Error: errEOF},
-	{File: "tests/tc20.ber", Error: ""},
+	{File: "tests/tc20.ber", Error: "integer too large"}, // 9-byte INTEGER overflows int64
 	// Object identifiers
-	{File: "tests/tc21.ber", Error: ""},
-	{File: "tests/tc22.ber", Error: ""},
+	{File: "tests/tc21.ber", Error: "integer is not minimally encoded"}, // non-minimal base-128 arc
+	{File: "tests/tc22.ber", Error: "base 128 integer too large"},       // oversized base-128 arc
 	{File: "tests/tc23.ber", Error: errEOF},
 	{File: "tests/tc24.ber", Error: ""},
 	// Booleans
@@ -99,7 +99,7 @@ func TestSuiteDecodePacket(t *testing.T) {
 	for _, tc := range testCases {
 		file := tc.File
 
-		dataIn, err := ioutil.ReadFile(file)
+		dataIn, err := os.ReadFile(file)
 		if err != nil {
 			t.Errorf("%s: %v", file, err)
 			continue
@@ -149,7 +149,7 @@ func TestSuiteReadPacket(t *testing.T) {
 	for _, tc := range testCases {
 		file := tc.File
 
-		dataIn, err := ioutil.ReadFile(file)
+		dataIn, err := os.ReadFile(file)
 		if err != nil {
 			t.Errorf("%s: %v", file, err)
 			continue

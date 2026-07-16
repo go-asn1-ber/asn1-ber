@@ -104,7 +104,8 @@ func TestReadHeader(t *testing.T) {
 		}
 
 		if identifier.ClassType != tc.ExpectedIdentifier.ClassType {
-			t.Errorf("%s: expected class type %d (%s), got %d (%s)", k,
+			t.Errorf(
+				"%s: expected class type %d (%s), got %d (%s)", k,
 				tc.ExpectedIdentifier.ClassType,
 				ClassMap[tc.ExpectedIdentifier.ClassType],
 				identifier.ClassType,
@@ -112,7 +113,8 @@ func TestReadHeader(t *testing.T) {
 			)
 		}
 		if identifier.TagType != tc.ExpectedIdentifier.TagType {
-			t.Errorf("%s: expected tag type %d (%s), got %d (%s)", k,
+			t.Errorf(
+				"%s: expected tag type %d (%s), got %d (%s)", k,
 				tc.ExpectedIdentifier.TagType,
 				TypeMap[tc.ExpectedIdentifier.TagType],
 				identifier.TagType,
@@ -120,7 +122,8 @@ func TestReadHeader(t *testing.T) {
 			)
 		}
 		if identifier.Tag != tc.ExpectedIdentifier.Tag {
-			t.Errorf("%s: expected tag %d (%s), got %d (%s)", k,
+			t.Errorf(
+				"%s: expected tag %d (%s), got %d (%s)", k,
 				tc.ExpectedIdentifier.Tag,
 				tagMap[tc.ExpectedIdentifier.Tag],
 				identifier.Tag,

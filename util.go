@@ -3,12 +3,14 @@ package ber
 import "io"
 
 func readByte(reader io.Reader) (byte, error) {
-	bytes := make([]byte, 1)
-	_, err := io.ReadFull(reader, bytes)
-	if err != nil {
+	if br, ok := reader.(io.ByteReader); ok {
+		return br.ReadByte()
+	}
+	var b [1]byte
+	if _, err := io.ReadFull(reader, b[:]); err != nil {
 		return 0, err
 	}
-	return bytes[0], nil
+	return b[0], nil
 }
 
 func unexpectedEOF(err error) error {
