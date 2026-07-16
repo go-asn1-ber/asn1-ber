@@ -345,9 +345,10 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 			contentRead += r
 			read += r
 
-			// Enforce the aggregate size limit for constructed packets
-			if MaxPacketLengthBytes > 0 && int64(read) > MaxPacketLengthBytes {
-				return nil, read, fmt.Errorf("length %d greater than maximum %d", read, MaxPacketLengthBytes)
+			// Enforce the aggregate size limit for constructed packets. Indefinite length declares
+			// no bound up front, so the content bytes are only known as they are read.
+			if MaxPacketLengthBytes > 0 && int64(contentRead) > MaxPacketLengthBytes {
+				return nil, read, fmt.Errorf("length %d greater than maximum %d", contentRead, MaxPacketLengthBytes)
 			}
 
 			// Test is this is the EOC marker for our packet
