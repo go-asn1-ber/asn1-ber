@@ -270,6 +270,19 @@ func buildNestedSequence(depth int) []byte {
 	return inner
 }
 
+func TestLongFormLengthSentinelCollision(t *testing.T) {
+	// A definite-form length of 2^64-1 must not be reinterpreted as indefinite form.
+	data := []byte{
+		0x30,                                                 // SEQUENCE, constructed
+		0x88, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // "length" = 2^64-1
+		0x05, 0x00, // NULL child
+		0x00, 0x00, // EOC
+	}
+	if _, err := DecodePacketErr(data); err == nil {
+		t.Error("expected error for definite-form length 2^64-1, got nil")
+	}
+}
+
 func TestMaxNestingDepth(t *testing.T) {
 	old := MaxNestingDepth
 	defer func() { MaxNestingDepth = old }()
