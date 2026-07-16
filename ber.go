@@ -308,6 +308,10 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		return nil, read, err
 	}
 
+	if length != LengthIndefinite && MaxPacketLengthBytes > 0 && int64(length) > MaxPacketLengthBytes {
+		return nil, read, fmt.Errorf("length %d greater than maximum %d", length, MaxPacketLengthBytes)
+	}
+
 	p := &Packet{
 		Identifier: identifier,
 	}
@@ -341,6 +345,12 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 			contentRead += r
 			read += r
 
+			// Enforce the aggregate size limit for constructed packets. Indefinite length declares
+			// no bound up front, so the content bytes are only known as they are read.
+			if MaxPacketLengthBytes > 0 && int64(contentRead) > MaxPacketLengthBytes {
+				return nil, read, fmt.Errorf("length %d greater than maximum %d", contentRead, MaxPacketLengthBytes)
+			}
+
 			// Test is this is the EOC marker for our packet
 			if isEOCPacket(child) {
 				if length == LengthIndefinite {
@@ -357,11 +367,6 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 
 	if length == LengthIndefinite {
 		return nil, read, errors.New("indefinite length used with primitive type")
-	}
-
-	// Read definite-length content
-	if MaxPacketLengthBytes > 0 && int64(length) > MaxPacketLengthBytes {
-		return nil, read, fmt.Errorf("length %d greater than maximum %d", length, MaxPacketLengthBytes)
 	}
 
 	var content []byte
