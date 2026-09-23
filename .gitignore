@@ -1,0 +1,16 @@
+# Compiled binaries and test artifacts
+*.exe
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Editor / OS cruft
+.idea/
+.vscode/
+.DS_Store
+*~

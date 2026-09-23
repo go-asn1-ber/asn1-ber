@@ -56,6 +56,12 @@ func readLength(reader io.Reader) (length int, read int, err error) {
 			length64 |= uint64(b)
 		}
 
+		// A negative accumulator means the top bit is set, i.e. the length
+		// exceeds MaxInt64 -- far larger than we could ever read.
+		if length64 < 0 {
+			return 0, read, errors.New("long-form length overflow")
+		}
+
 		// Cast to a platform-specific integer
 		length = int(length64)
 		// Ensure we didn't overflow or wrap negative. Length octets are unsigned
@@ -63,9 +69,6 @@ func readLength(reader io.Reader) (length int, read int, err error) {
 		if length < 0 || uint64(length) != length64 {
 			return 0, read, errors.New("long-form length overflow")
 		}
-
-	default:
-		return 0, read, errors.New("invalid length byte")
 	}
 
 	return length, read, nil

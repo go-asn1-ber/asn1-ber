@@ -1,39 +1,48 @@
 name: PR
 
 on:
+  push:
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
+
+permissions:
+  contents: read
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [
-          '1.20',
-          '1.19',
-          '1.18',
-          '1.17',
-          '1.16',
-          '1.15',
-          '1.14',
-          '1.13',
-        ]
-    name: Go ${{ matrix.go }}.x PR Validate
+        # stable + oldstable track the two supported upstream Go releases;
+        # "1.22" pins the go.mod floor so we prove the module still builds there.
+        go: [stable, oldstable, "1.22"]
+    name: Go ${{ matrix.go }}
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go build -v ./...
+      - run: go test -v -race -cover -cpu 1,2,4 ./...
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.go }}
+  fuzz:
+    runs-on: ubuntu-latest
+    name: Fuzz
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: Fuzz the decoder
+        run: go test -run='^$' -fuzz=FuzzDecodePacket -fuzztime=60s ./...
 
-    - name: Version
-      run: go version
-
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v -cover -race -cpu 1,2,4 ./...
+  vulncheck:
+    runs-on: ubuntu-latest
+    name: govulncheck
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

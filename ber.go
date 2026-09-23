@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -25,8 +24,12 @@ var MaxNestingDepth int = 1000
 
 type Packet struct {
 	Identifier
-	Value       interface{}
-	ByteValue   []byte
+	Value     interface{}
+	ByteValue []byte
+	// Data holds the raw content octets of a primitive packet. For a
+	// constructed packet it is NOT populated after decoding or AppendChild --
+	// the content is derived lazily from Children by Bytes(). Do not read Data
+	// on a constructed packet; walk Children or call Bytes() instead.
 	Data        *bytes.Buffer
 	Children    []*Packet
 	Description string
@@ -181,7 +184,6 @@ func PrintPacket(p *Packet) {
 // If the packet is a sequence, use `printPacket()`, or browse
 // sequence yourself.
 func DescribePacket(p *Packet) string {
-
 	classStr := ClassMap[p.ClassType]
 
 	tagTypeStr := TypeMap[p.TagType]
@@ -199,7 +201,26 @@ func DescribePacket(p *Packet) string {
 		description = p.Description + ": "
 	}
 
-	return fmt.Sprintf("%s(%s, %s, %s) Len=%d %q", description, classStr, tagTypeStr, tagStr, p.Data.Len(), value)
+	return fmt.Sprintf("%s(%s, %s, %s) Len=%d %q", description, classStr, tagTypeStr, tagStr, p.contentLength(), value)
+}
+
+// contentLength reports the length in bytes of the packet's BER content -- the
+// value that follows the length octets -- computed without materializing the
+// encoded form. For a constructed packet this recurses through its children.
+func (p *Packet) contentLength() int {
+	if len(p.Children) == 0 {
+		if p.Data == nil {
+			return 0
+		}
+		return p.Data.Len()
+	}
+
+	n := 0
+	for _, child := range p.Children {
+		c := child.contentLength()
+		n += len(encodeIdentifier(child.Identifier)) + len(encodeLength(c)) + c
+	}
+	return n
 }
 
 func printPacket(out io.Writer, p *Packet, indent int, printBytes bool) {
@@ -236,7 +257,7 @@ func DecodeString(data []byte) string {
 func ParseInt64(bytes []byte) (ret int64, err error) {
 	if len(bytes) > 8 {
 		// We'll overflow an int64 in this case.
-		err = fmt.Errorf("integer too large")
+		err = errors.New("integer too large")
 		return
 	}
 	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
@@ -282,7 +303,10 @@ func int64Length(i int64) (numBytes int) {
 // DecodePacket decodes the given bytes into a single Packet
 // If a decode error is encountered, nil is returned.
 func DecodePacket(data []byte) *Packet {
-	p, _, _ := readPacket(bytes.NewBuffer(data), 0)
+	p, _, err := readPacket(bytes.NewBuffer(data), 0)
+	if err != nil {
+		return nil
+	}
 
 	return p
 }
@@ -373,7 +397,7 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 	if length > 0 {
 		// Read the content and limit it to the parsed length.
 		// If the content is less than the length, we return an EOF error.
-		content, err = ioutil.ReadAll(io.LimitReader(reader, int64(length)))
+		content, err = io.ReadAll(io.LimitReader(reader, int64(length)))
 		if err == nil && len(content) < int(length) {
 			err = io.EOF
 		}
@@ -393,11 +417,12 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		switch p.Tag {
 		case TagEOC:
 		case TagBoolean:
-			val, _ := ParseInt64(content)
+			var val int64
+			val, err = ParseInt64(content)
 
 			p.Value = val != 0
 		case TagInteger:
-			p.Value, _ = ParseInt64(content)
+			p.Value, err = ParseInt64(content)
 		case TagBitString:
 		case TagOctetString:
 			// the actual string encoding is not known here
@@ -406,8 +431,8 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 			p.Value = DecodeString(content)
 		case TagNULL:
 		case TagObjectIdentifier:
-			oid, err := parseObjectIdentifier(content)
-			if err == nil {
+			var oid []int
+			if oid, err = parseObjectIdentifier(content); err == nil {
 				p.Value = OIDToString(oid)
 			}
 		case TagObjectDescriptor:
@@ -415,7 +440,7 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		case TagRealFloat:
 			p.Value, err = ParseReal(content)
 		case TagEnumerated:
-			p.Value, _ = ParseInt64(content)
+			p.Value, err = ParseInt64(content)
 		case TagEmbeddedPDV:
 		case TagUTF8String:
 			val := DecodeString(content)
@@ -425,8 +450,8 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 				p.Value = val
 			}
 		case TagRelativeOID:
-			oid, err := parseRelativeObjectIdentifier(content)
-			if err == nil {
+			var oid []int
+			if oid, err = parseRelativeObjectIdentifier(content); err == nil {
 				p.Value = OIDToString(oid)
 			}
 		case TagSequence:
@@ -442,7 +467,7 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		case TagIA5String:
 			val := DecodeString(content)
 			for i, c := range val {
-				if c >= 0x7F {
+				if c > 0x7F {
 					err = fmt.Errorf("invalid character for IA5String at pos %d: %c", i, c)
 					break
 				}
@@ -464,7 +489,14 @@ func readPacket(reader io.Reader, depth int) (*Packet, int, error) {
 		p.Data.Write(content)
 	}
 
-	return p, read, err
+	// A content-parse failure (invalid REAL, UTF-8, OID, over-long INTEGER,
+	// etc.) yields no usable packet; return nil so callers never see a
+	// partially-populated packet alongside an error.
+	if err != nil {
+		return nil, read, err
+	}
+
+	return p, read, nil
 }
 
 func isPrintableString(val string) error {
@@ -484,18 +516,39 @@ func isPrintableString(val string) error {
 	return nil
 }
 
+// Bytes returns the BER encoding of the packet and, for a constructed packet,
+// its children. It is recomputed on each call (not cached), so avoid calling it
+// repeatedly on large packets in hot paths.
 func (p *Packet) Bytes() []byte {
 	var out bytes.Buffer
 
 	out.Write(encodeIdentifier(p.Identifier))
-	out.Write(encodeLength(p.Data.Len()))
-	out.Write(p.Data.Bytes())
+
+	if len(p.Children) == 0 {
+		// Primitive packet (or an empty constructed one): the content is p.Data.
+		out.Write(encodeLength(p.Data.Len()))
+		out.Write(p.Data.Bytes())
+		return out.Bytes()
+	}
+
+	// Constructed packet: serialize children on demand. We deliberately do not
+	// cache this in p.Data (see AppendChild): doing so at every level made a
+	// decoded tree cost O(depth x subtree) memory.
+	var content bytes.Buffer
+	for _, child := range p.Children {
+		content.Write(child.Bytes())
+	}
+	out.Write(encodeLength(content.Len()))
+	out.Write(content.Bytes())
 
 	return out.Bytes()
 }
 
 func (p *Packet) AppendChild(child *Packet) {
-	p.Data.Write(child.Bytes())
+	// Children are serialized lazily by Bytes(); we intentionally do not copy
+	// the child's encoded form into p.Data. Eager buffering made every ancestor
+	// retain a full copy of its subtree -- an O(depth x subtree) memory
+	// amplification that a deeply-nested packet could exploit.
 	p.Children = append(p.Children, child)
 }
 
@@ -515,7 +568,8 @@ func Encode(classType Class, tagType Type, tag Tag, value interface{}, descripti
 	if value != nil {
 		v := reflect.ValueOf(value)
 
-		if classType == ClassUniversal {
+		switch classType {
+		case ClassUniversal:
 			switch tag {
 			case TagOctetString:
 				sv, ok := v.Interface().(string)
@@ -534,7 +588,7 @@ func Encode(classType Class, tagType Type, tag Tag, value interface{}, descripti
 					p.Data.Write(bv)
 				}
 			}
-		} else if classType == ClassContext {
+		case ClassContext:
 			switch tag {
 			case TagEnumerated:
 				bv, ok := v.Interface().([]byte)
@@ -585,7 +639,9 @@ func NewLDAPBoolean(classType Class, tagType Type, tag Tag, value bool, descript
 	return p
 }
 
-func NewInteger(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+// NewIntegerErr behaves like [NewInteger] but returns an error instead of
+// panicking when value is not a supported signed or unsigned integer type.
+func NewIntegerErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
 	p := Encode(classType, tagType, tag, nil, description)
 
 	p.Value = value
@@ -613,9 +669,19 @@ func NewInteger(classType Class, tagType Type, tag Tag, value interface{}, descr
 		p.Data.Write(encodeInteger(int64(v)))
 	default:
 		// TODO : add support for big.Int ?
-		panic(fmt.Sprintf("Invalid type %T, expected {u|}int{64|32|16|8}", v))
+		return nil, fmt.Errorf("invalid type %T, expected {u|}int{64|32|16|8}", v)
 	}
 
+	return p, nil
+}
+
+// NewInteger builds an INTEGER packet. It panics if value is not a signed or
+// unsigned integer type; use [NewIntegerErr] to receive an error instead.
+func NewInteger(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+	p, err := NewIntegerErr(classType, tagType, tag, value, description)
+	if err != nil {
+		panic(err.Error())
+	}
 	return p
 }
 
@@ -641,7 +707,9 @@ func NewGeneralizedTime(classType Class, tagType Type, tag Tag, value time.Time,
 	return p
 }
 
-func NewReal(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+// NewRealErr behaves like [NewReal] but returns an error instead of panicking
+// when value is not a float32 or float64.
+func NewRealErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
 	p := Encode(classType, tagType, tag, nil, description)
 
 	switch v := value.(type) {
@@ -650,67 +718,110 @@ func NewReal(classType Class, tagType Type, tag Tag, value interface{}, descript
 	case float32:
 		p.Data.Write(encodeFloat(float64(v)))
 	default:
-		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+		return nil, fmt.Errorf("invalid type %T, expected float{64|32}", v)
+	}
+	return p, nil
+}
+
+// NewReal builds a REAL packet. It panics if value is not a float32 or float64;
+// use [NewRealErr] to receive an error instead.
+func NewReal(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+	p, err := NewRealErr(classType, tagType, tag, value, description)
+	if err != nil {
+		panic(err.Error())
 	}
 	return p
 }
 
+// NewOIDErr behaves like [NewOID] but returns an error instead of panicking on
+// a non-string value or returning nil on an invalid OID string.
+func NewOIDErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
+	p := Encode(classType, tagType, tag, nil, description)
+
+	v, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid type %T, expected string", value)
+	}
+	encoded, err := encodeOID(v)
+	if err != nil {
+		return nil, err
+	}
+	p.Value = v
+	p.Data.Write(encoded)
+	return p, nil
+}
+
+// Deprecated: NewOID panics on a non-string value and returns nil on an invalid
+// OID string. Use [NewOIDErr], which reports both as errors.
 func NewOID(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
-	p := Encode(classType, tagType, tag, nil, description)
-
-	switch v := value.(type) {
-	case string:
-		encoded, err := encodeOID(v)
-		if err != nil {
-			fmt.Printf("failed writing %v", err)
-			return nil
+	p, err := NewOIDErr(classType, tagType, tag, value, description)
+	if err != nil {
+		if _, ok := value.(string); !ok {
+			panic(err.Error())
 		}
-		p.Value = v
-		p.Data.Write(encoded)
-		// TODO: support []int already ?
-	default:
-		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+		return nil
 	}
 	return p
 }
 
-func NewRelativeOID(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+// NewRelativeOIDErr behaves like [NewRelativeOID] but returns an error instead
+// of panicking on a non-string value or returning nil on invalid input.
+func NewRelativeOIDErr(classType Class, tagType Type, tag Tag, value interface{}, description string) (*Packet, error) {
 	p := Encode(classType, tagType, tag, nil, description)
 
-	switch v := value.(type) {
-	case string:
-		encoded, err := encodeRelativeOID(v)
-		if err != nil {
-			fmt.Printf("failed writing %v", err)
-			return nil
+	v, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid type %T, expected string", value)
+	}
+	encoded, err := encodeRelativeOID(v)
+	if err != nil {
+		return nil, err
+	}
+	p.Value = v
+	p.Data.Write(encoded)
+	return p, nil
+}
+
+// Deprecated: NewRelativeOID panics on a non-string value and returns nil on
+// invalid input. Use [NewRelativeOIDErr], which reports both as errors.
+func NewRelativeOID(classType Class, tagType Type, tag Tag, value interface{}, description string) *Packet {
+	p, err := NewRelativeOIDErr(classType, tagType, tag, value, description)
+	if err != nil {
+		if _, ok := value.(string); !ok {
+			panic(err.Error())
 		}
-		p.Value = v
-		p.Data.Write(encoded)
-		// TODO: support []int already ?
-	default:
-		panic(fmt.Sprintf("Invalid type %T, expected float{64|32}", v))
+		return nil
 	}
 	return p
+}
+
+// parseDottedInts splits a dotted-decimal OID string (e.g. "1.2.840") into its
+// integer arcs. label names the OID kind for error messages.
+func parseDottedInts(oidString, label string) ([]int, error) {
+	parts := strings.Split(oidString, ".")
+	oid := make([]int, len(parts))
+	for i, part := range parts {
+		val, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s part '%s': %w", label, part, err)
+		}
+		oid[i] = val
+	}
+	return oid, nil
 }
 
 // encodeOID takes a string representation of an OID and returns its DER-encoded byte slice along with any error.
 func encodeOID(oidString string) ([]byte, error) {
-	// Convert the string representation to an asn1.ObjectIdentifier
-	parts := strings.Split(oidString, ".")
-	oid := make([]int, len(parts))
-	for i, part := range parts {
-		var val int
-		if _, err := fmt.Sscanf(part, "%d", &val); err != nil {
-			return nil, fmt.Errorf("invalid OID part '%s': %w", part, err)
-		}
-		oid[i] = val
+	oid, err := parseDottedInts(oidString, "OID")
+	if err != nil {
+		return nil, err
 	}
 	if len(oid) < 2 || oid[0] > 2 || (oid[0] < 2 && oid[1] >= 40) {
-		panic(fmt.Sprintf("invalid object identifier % d", oid)) // TODO: not elegant
+		return nil, fmt.Errorf("invalid object identifier %v", oid)
 	}
-	encoded := make([]byte, 0)
 
-	encoded = appendBase128Int(encoded[:0], int64(oid[0]*40+oid[1]))
+	// The first two arcs are combined into a single value: 40*arc0 + arc1.
+	encoded := appendBase128Int(nil, int64(oid[0]*40+oid[1]))
 	for i := 2; i < len(oid); i++ {
 		encoded = appendBase128Int(encoded, int64(oid[i]))
 	}
@@ -719,20 +830,14 @@ func encodeOID(oidString string) ([]byte, error) {
 }
 
 func encodeRelativeOID(oidString string) ([]byte, error) {
-	parts := strings.Split(oidString, ".")
-	oid := make([]int, len(parts))
-	for i, part := range parts {
-		var val int
-		if _, err := fmt.Sscanf(part, "%d", &val); err != nil {
-			return nil, fmt.Errorf("invalid RELATIVE OID part '%s': %w", part, err)
-		}
-		oid[i] = val
+	oid, err := parseDottedInts(oidString, "RELATIVE OID")
+	if err != nil {
+		return nil, err
 	}
 
-	encoded := make([]byte, 0)
-
-	for i := 0; i < len(oid); i++ {
-		encoded = appendBase128Int(encoded, int64(oid[i]))
+	var encoded []byte
+	for _, arc := range oid {
+		encoded = appendBase128Int(encoded, int64(arc))
 	}
 
 	return encoded, nil
@@ -753,6 +858,7 @@ func appendBase128Int(dst []byte, n int64) []byte {
 
 	return dst
 }
+
 func base128IntLength(n int64) int {
 	if n == 0 {
 		return 1
@@ -781,18 +887,33 @@ func OIDToString(oi []int) string {
 	return s.String()
 }
 
+// parseBase128Ints decodes successive base-128 integers from bytes[offset:]
+// into dst starting at index i, returning the index one past the last element
+// written (the total count when i started at 0).
+func parseBase128Ints(bytes []byte, offset int, dst []int, i int) (int, error) {
+	for offset < len(bytes) {
+		v, next, err := parseBase128Int(bytes, offset)
+		if err != nil {
+			return i, err
+		}
+		dst[i] = v
+		offset = next
+		i++
+	}
+	return i, nil
+}
+
 // parseObjectIdentifier parses an OBJECT IDENTIFIER from the given bytes and
 // returns it. An object identifier is a sequence of variable length integers
 // that are assigned in a hierarchy.
-func parseObjectIdentifier(bytes []byte) (s []int, err error) {
+func parseObjectIdentifier(bytes []byte) ([]int, error) {
 	if len(bytes) == 0 {
-		err = fmt.Errorf("zero length OBJECT IDENTIFIER")
-		return
+		return nil, errors.New("zero length OBJECT IDENTIFIER")
 	}
 
 	// In the worst case, we get two elements from the first byte (which is
 	// encoded differently) and then every varint is a single byte long.
-	s = make([]int, len(bytes)+1)
+	s := make([]int, len(bytes)+1)
 
 	// The first varint is 40*value1 + value2:
 	// According to this packing, value1 can take the values 0, 1 and 2 only.
@@ -800,7 +921,7 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 	// then there are no restrictions on value2.
 	v, offset, err := parseBase128Int(bytes, 0)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if v < 80 {
 		s[0] = v / 40
@@ -810,37 +931,25 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 		s[1] = v - 80
 	}
 
-	i := 2
-	for ; offset < len(bytes); i++ {
-		v, offset, err = parseBase128Int(bytes, offset)
-		if err != nil {
-			return
-		}
-		s[i] = v
+	i, err := parseBase128Ints(bytes, offset, s, 2)
+	if err != nil {
+		return nil, err
 	}
-	s = s[0:i]
-	return
+	return s[:i], nil
 }
 
-func parseRelativeObjectIdentifier(bytes []byte) (s []int, err error) {
+func parseRelativeObjectIdentifier(bytes []byte) ([]int, error) {
 	if len(bytes) == 0 {
-		err = fmt.Errorf("zero length RELATIVE OBJECT IDENTIFIER")
-		return
+		return nil, errors.New("zero length RELATIVE OBJECT IDENTIFIER")
 	}
 
-	s = make([]int, len(bytes)+1)
+	s := make([]int, len(bytes)+1)
 
-	var v, offset int
-	i := 0
-	for ; offset < len(bytes); i++ {
-		v, offset, err = parseBase128Int(bytes, offset)
-		if err != nil {
-			return
-		}
-		s[i] = v
+	i, err := parseBase128Ints(bytes, 0, s, 0)
+	if err != nil {
+		return nil, err
 	}
-	s = s[0:i]
-	return
+	return s[:i], nil
 }
 
 // parseBase128Int parses a base-128 encoded int from the given offset in the
@@ -852,7 +961,7 @@ func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) 
 		// 5 * 7 bits per byte == 35 bits of data
 		// Thus the representation is either non-minimal or too large for an int32
 		if shifted == 5 {
-			err = fmt.Errorf("base 128 integer too large")
+			err = errors.New("base 128 integer too large")
 			return
 		}
 		ret64 <<= 7
@@ -860,7 +969,7 @@ func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) 
 		// integers should be minimally encoded, so the leading octet should
 		// never be 0x80
 		if shifted == 0 && b == 0x80 {
-			err = fmt.Errorf("integer is not minimally encoded")
+			err = errors.New("integer is not minimally encoded")
 			return
 		}
 		ret64 |= int64(b & 0x7f)
@@ -869,11 +978,11 @@ func parseBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) 
 			ret = int(ret64)
 			// Ensure that the returned value fits in an int on all platforms
 			if ret64 > math.MaxInt32 {
-				err = fmt.Errorf("base 128 integer too large")
+				err = errors.New("base 128 integer too large")
 			}
 			return
 		}
 	}
-	err = fmt.Errorf("truncated base 128 integer")
+	err = errors.New("truncated base 128 integer")
 	return
 }

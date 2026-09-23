@@ -1,24 +1,69 @@
-[![GoDoc](https://godoc.org/gopkg.in/asn1-ber.v1?status.svg)](https://godoc.org/gopkg.in/asn1-ber.v1) [![Build Status](https://travis-ci.org/go-asn1-ber/asn1-ber.svg)](https://travis-ci.org/go-asn1-ber/asn1-ber)
+# asn1-ber
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/go-asn1-ber/asn1-ber.svg)](https://pkg.go.dev/github.com/go-asn1-ber/asn1-ber)
+[![PR](https://github.com/go-asn1-ber/asn1-ber/actions/workflows/pr.yml/badge.svg)](https://github.com/go-asn1-ber/asn1-ber/actions/workflows/pr.yml)
+[![Lint](https://github.com/go-asn1-ber/asn1-ber/actions/workflows/lint.yml/badge.svg)](https://github.com/go-asn1-ber/asn1-ber/actions/workflows/lint.yml)
 
-ASN1 BER Encoding / Decoding Library for the GO programming language.
----------------------------------------------------------------------
+ASN.1 BER encoding and decoding for Go, with no external dependencies. This is
+the BER layer used by [go-ldap](https://github.com/go-ldap/ldap); it implements
+the subset of BER/DER needed for LDAP (RFC 4511), including integers, booleans,
+strings, object identifiers, REAL numbers, and generalized time.
 
-Required libraries: 
-   None
+## Install
 
-Working:
-   Very basic encoding / decoding needed for LDAP protocol
+```sh
+go get github.com/go-asn1-ber/asn1-ber
+```
 
-Tests Implemented:
-   A few
+Requires Go 1.22 or newer.
 
-TODO:
-   Fix all encoding / decoding to conform to ASN1 BER spec
-   Implement Tests / Benchmarks
+## Usage
 
----
+```go
+package main
 
-The Go gopher was designed by Renee French. (http://reneefrench.blogspot.com/)
-The design is licensed under the Creative Commons 3.0 Attributions license.
-Read this article for more details: http://blog.golang.org/gopher
+import (
+	"fmt"
+
+	ber "github.com/go-asn1-ber/asn1-ber"
+)
+
+func main() {
+	// Encode a SEQUENCE containing a single OCTET STRING.
+	seq := ber.NewSequence("greeting")
+	seq.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "Hello, world", ""))
+
+	// Serialize, then decode back into a packet tree.
+	packet, err := ber.DecodePacketErr(seq.Bytes())
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(packet.Children[0].Value) // Hello, world
+}
+```
+
+`DecodePacketErr` (and `ReadPacket`, which reads from an `io.Reader`) return an
+error on malformed input. `DecodePacket` is an older variant that returns `nil`
+instead; prefer the `Err` form. When decoding untrusted data, the
+`MaxPacketLengthBytes` and `MaxNestingDepth` package variables bound memory and
+recursion.
+
+See the [reference documentation](https://pkg.go.dev/github.com/go-asn1-ber/asn1-ber)
+for the full API.
+
+## Development
+
+```sh
+go test -race ./...                       # unit tests + conformance suite
+go test -run='^$' -fuzz=FuzzDecodePacket  # fuzz the decoder
+golangci-lint run                         # lint
+```
+
+The conformance suite in `tests/` is built from the
+[Strozhevsky ASN.1 test suite](http://www.strozhevsky.com/free_docs/); see
+[tests/README.md](tests/README.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
